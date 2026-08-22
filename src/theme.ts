@@ -39,9 +39,54 @@ export const TOKENS = {
   accentSoft: "#f4e3dd",
   rule: "#d9d2c2",
   ruleSoft: "#e8e2d3",
+  // Inlined until dark mode needed them named. The banner carries its own pair rather than
+  // reusing --ink as a background: inverted, --ink IS the page text colour, so a banner painted
+  // with it disappears into the page instead of standing off it.
+  bannerBg: "#231f18",
+  bannerFg: "#efe9dc",
+  bannerAccent: "#f2b8a4",
+  linkRule: "rgba(140,47,27,.35)",
+  ghostInk: "rgba(140,47,27,.055)",
+  dot: "rgba(35,31,24,.045)",
+  dotSoft: "rgba(35,31,24,.024)",
   display: '"Fraunces",Georgia,"Times New Roman",serif',
   body: '"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif',
   mono: '"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace',
+} as const;
+
+/**
+ * The dark palette — the same document, not a different one.
+ *
+ * Only the colour tokens are redefined; every rule in the stylesheet already reads through
+ * `var(--…)`, so nothing else has to know dark mode exists. Two deliberate choices:
+ *
+ * - **Warm, not neutral.** The light design is cream paper and ink, and a generic `#111` ground
+ *   reads as a different product rather than the same one at night.
+ * - **The accent lightens.** `#8c2f1b` is a 2.1:1 terracotta against a dark ground — unreadable.
+ *   Links and kickers move to a tint that clears 4.5:1, because an accent that fails contrast in
+ *   half the renders is not an accent, it is a bug that only some readers see.
+ *
+ * Print is untouched by design: `@media print` hardcodes its own values because paper is white
+ * whatever the screen is doing, and a dark-mode PDF is a ruined one.
+ */
+export const DARK = {
+  paper: "#17150f",
+  paperDeep: "#201d15",
+  paperCard: "#1e1b14",
+  ink: "#ece5d6",
+  ink2: "#b6ad9c",
+  ink3: "#8d8574",
+  accent: "#e6947a",
+  accentSoft: "#3a241d",
+  rule: "#38332a",
+  ruleSoft: "#2a261f",
+  bannerBg: "#2a261f",
+  bannerFg: "#ece5d6",
+  bannerAccent: "#f2b8a4",
+  linkRule: "rgba(230,148,122,.4)",
+  ghostInk: "rgba(230,148,122,.05)",
+  dot: "rgba(236,229,214,.05)",
+  dotSoft: "rgba(236,229,214,.028)",
 } as const;
 
 /**
@@ -139,15 +184,24 @@ function calloutCss(): string {
     .join("\n");
 }
 
+/** One palette as custom properties. Light and dark go through the same writer, so a token
+ *  added to one and forgotten in the other is impossible rather than merely unlikely. */
+function palette(t: typeof TOKENS | typeof DARK): string {
+  return `  --paper:${t.paper}; --paper-deep:${t.paperDeep}; --paper-card:${t.paperCard};
+  --ink:${t.ink}; --ink-2:${t.ink2}; --ink-3:${t.ink3};
+  --accent:${t.accent}; --accent-soft:${t.accentSoft};
+  --rule:${t.rule}; --rule-soft:${t.ruleSoft};
+  --banner-bg:${t.bannerBg}; --banner-fg:${t.bannerFg}; --banner-accent:${t.bannerAccent};
+  --link-rule:${t.linkRule}; --ghost-ink:${t.ghostInk};
+  --dot:${t.dot}; --dot-soft:${t.dotSoft};`;
+}
+
 function styles(embedFonts: boolean): string {
   return `
 ${embedFonts ? fontFaceCss() : ""}
 
 :root{
-  --paper:${TOKENS.paper}; --paper-deep:${TOKENS.paperDeep}; --paper-card:${TOKENS.paperCard};
-  --ink:${TOKENS.ink}; --ink-2:${TOKENS.ink2}; --ink-3:${TOKENS.ink3};
-  --accent:${TOKENS.accent}; --accent-soft:${TOKENS.accentSoft};
-  --rule:${TOKENS.rule}; --rule-soft:${TOKENS.ruleSoft};
+${palette(TOKENS)}
   --display:${TOKENS.display};
   --body:${TOKENS.body};
   --mono:${TOKENS.mono};
@@ -155,35 +209,47 @@ ${embedFonts ? fontFaceCss() : ""}
      the measure the type scale is set for (and the p / pre max-width). */
   --max:84rem; --rail:16rem; --gutter:2.4rem;
 }
+
+/* Dark mode has three states, and all three must be handled or one of them borrows the host's
+   colours. "System" stamps nothing on the root element, so only the media query separates it;
+   an explicit choice stamps data-theme and must beat the query in BOTH directions. */
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+${palette(DARK)}
+  }
+}
+:root[data-theme="dark"]{
+${palette(DARK)}
+}
 *{box-sizing:border-box}
 html{scroll-behavior:smooth; -webkit-text-size-adjust:100%}
 body{
   margin:0; background:var(--paper); color:var(--ink);
   font:400 16px/1.62 var(--body);
-  background-image:radial-gradient(circle at 1px 1px, rgba(35,31,24,.045) 1px, transparent 0);
+  background-image:radial-gradient(circle at 1px 1px, var(--dot) 1px, transparent 0);
   background-size:26px 26px;
   text-rendering:optimizeLegibility;
 }
 .sheet{max-width:var(--max); margin:0 auto; padding:0 2.2rem 5rem}
-a{color:var(--accent); text-decoration-color:rgba(140,47,27,.35); text-underline-offset:3px}
+a{color:var(--accent); text-decoration-color:var(--link-rule); text-underline-offset:3px}
 a:hover{text-decoration-color:var(--accent)}
 ::selection{background:var(--accent-soft)}
 :focus-visible{outline:2px solid var(--accent); outline-offset:2px}
 
 /* ── banner: left = context, right = status ─────────────────────────────── */
 .banner{
-  background:var(--ink); color:#efe9dc; font:500 12px/1.5 var(--mono);
+  background:var(--banner-bg); color:var(--banner-fg); font:500 12px/1.5 var(--mono);
   letter-spacing:.06em; text-transform:uppercase; padding:.55rem 2.2rem;
   display:flex; justify-content:space-between; gap:1rem; flex-wrap:wrap;
 }
-.banner b{color:#f2b8a4; font-weight:500}
+.banner b{color:var(--banner-accent); font-weight:500}
 .banner .right{text-align:right}
 
 /* ── masthead ──────────────────────────────────────────────────────────── */
 header.mast{padding:3.4rem 0 2rem; border-bottom:3px double var(--rule); position:relative; animation:rise .6s ease both}
 .ghost{
   position:absolute; right:-1rem; top:-1rem; font:900 italic 16rem/1 var(--display);
-  color:rgba(140,47,27,.055); pointer-events:none; user-select:none; z-index:-1; letter-spacing:-.05em;
+  color:var(--ghost-ink); pointer-events:none; user-select:none; z-index:-1; letter-spacing:-.05em;
 }
 .kicker{font:500 12.5px/1.4 var(--mono); letter-spacing:.14em; text-transform:uppercase; color:var(--accent); margin:0 0 1rem}
 h1{font:900 clamp(1.95rem,4vw,2.9rem)/1.07 var(--display); letter-spacing:-.015em; margin:0 0 1.1rem; text-wrap:balance}
@@ -258,7 +324,7 @@ li{margin:.3rem 0}
 li > ul, li > ol{margin-top:.3rem}
 code{font:400 .88em/1.4 var(--mono); background:var(--paper-deep); border:1px solid var(--rule-soft); border-radius:3px; padding:.08em .32em}
 pre{
-  background:var(--ink); color:#efe9dc; border-radius:4px; padding:1rem 1.15rem;
+  background:var(--banner-bg); color:var(--banner-fg); border-radius:4px; padding:1rem 1.15rem;
   overflow-x:auto; max-width:62rem; font-size:.84rem; line-height:1.55;
   box-shadow:4px 4px 0 var(--paper-deep);
 }
@@ -323,7 +389,7 @@ th{
   text-align:left; padding:.6rem .9rem; border-bottom:1.5px solid var(--ink); vertical-align:bottom;
 }
 td{padding:.55rem .9rem; border-bottom:1px solid var(--rule-soft); vertical-align:top}
-tbody tr:nth-child(even){background:rgba(35,31,24,.024)}
+tbody tr:nth-child(even){background:var(--dot-soft)}
 tbody tr:hover{background:var(--paper-deep)}
 tbody tr:last-child td{border-bottom:0}
 td.num{font-feature-settings:"tnum"; white-space:nowrap; font-variant-numeric:tabular-nums}
@@ -491,6 +557,8 @@ export type PageParts = {
   body: string;
   footer: string;
   embedFonts: boolean;
+  /** Emit body-level content only, for publishing as a Claude Artifact. */
+  artifact?: boolean;
 };
 
 function escapeHtml(text: string): string {
@@ -528,18 +596,7 @@ ${parts.toc
   // body keeps the full sheet width rather than printing against an empty strip.
   const content = toc ? `<div class="layout">\n${toc}\n\n${main}\n</div>` : main;
 
-  return `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escapeHtml(parts.title)}</title>
-<style>
-${styles(parts.embedFonts)}
-</style>
-</head>
-<body>
-${banner}
+  const body = `${banner}
 <div class="sheet">
 
 <header class="mast">
@@ -554,7 +611,37 @@ ${content}
 <footer class="doc">${parts.footer}</footer>
 
 </div>
-<script>${TOC_SCRIPT}</script>
+<script>${TOC_SCRIPT}</script>`;
+
+  // A Claude Artifact is served as body-level content: the host supplies the doctype, <html>,
+  // <head> and <body> and wraps whatever we hand it, so emitting our own shell would nest a
+  // second document inside the first. The <title> stays — the host reads it out of the first
+  // 8KB to name the tab and the gallery card — and the stylesheet stays inline, because the
+  // artifact CSP blocks every external host and the whole renderer is built around that anyway.
+  //
+  // This is the same document, not a reduced one: same styles, same masthead, same rail. The
+  // only thing dropped is the wrapper the host is about to provide.
+  if (parts.artifact) {
+    return `<title>${escapeHtml(parts.title)}</title>
+<style>
+${styles(parts.embedFonts)}
+</style>
+${body}
+`;
+  }
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtml(parts.title)}</title>
+<style>
+${styles(parts.embedFonts)}
+</style>
+</head>
+<body>
+${body}
 </body>
 </html>
 `;
