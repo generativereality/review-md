@@ -37,6 +37,36 @@ export function gitRoot(dir: string): string | null {
   return git(dir, ["rev-parse", "--show-toplevel"]);
 }
 
+const sshHostCache = new Map<string, string>();
+
+/**
+ * The real hostname behind an SSH host alias, via `ssh -G`.
+ *
+ * Multi-account setups routinely clone through a `~/.ssh/config` alias —
+ * `git@github.work:owner/repo.git`, where `github.work` is a `Host` block whose `Hostname` is
+ * `github.com`. Taken literally that produces `https://github.work/owner/repo`, a link that is
+ * dead for everyone including the person who rendered it. `ssh -G` is the only thing that knows;
+ * it echoes the input back unchanged when there is no alias, so this is safe to always call.
+ */
+function resolveSshHost(host: string): string {
+  const cached = sshHostCache.get(host);
+  if (cached !== undefined) return cached;
+
+  let resolved = host;
+  try {
+    const config = execFileSync("ssh", ["-G", host], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    const match = /^hostname (.+)$/m.exec(config);
+    if (match) resolved = match[1].trim() || host;
+  } catch {
+    // No ssh, or it refused the host — the literal is the best guess available.
+  }
+  sshHostCache.set(host, resolved);
+  return resolved;
+}
+
 /**
  * `git remote get-url origin`, normalised to a browsable https base — `git@host:owner/repo.git`
  * and `ssh://git@host/owner/repo.git` both become `https://host/owner/repo`.
@@ -45,22 +75,31 @@ export function gitRoot(dir: string): string | null {
  * against, so it has to describe the repo the *source document* lives in — never a constant
  * baked into the renderer, which is exactly how this tool used to hardcode one product's repo
  * into every artifact it produced.
+ *
+ * `resolveHost` is injectable purely so the SSH-alias behaviour is testable without a
+ * `~/.ssh/config`; production always uses `resolveSshHost`.
  */
-export function normaliseRemoteUrl(remote: string): string | null {
+export function normaliseRemoteUrl(
+  remote: string,
+  resolveHost: (host: string) => string = resolveSshHost,
+): string | null {
   const trimmed = remote.trim().replace(/\/+$/, "");
   if (!trimmed) return null;
 
-  // scp-style: git@github.com:owner/repo.git
+  // scp-style: git@github.com:owner/repo.git — the form an SSH clone leaves behind, and the one
+  // an alias hides in.
   const scp = /^(?:[^@/\s]+@)?([^:/\s]+):(?!\/)(.+)$/.exec(trimmed);
-  if (scp) return `https://${scp[1]}/${scp[2].replace(/\.git$/, "")}`;
+  if (scp) return `https://${resolveHost(scp[1])}/${scp[2].replace(/\.git$/, "")}`;
 
   try {
     const url = new URL(trimmed);
     if (url.protocol === "file:") return null;
     const pathname = url.pathname.replace(/\.git$/, "").replace(/^\/+/, "");
     if (!pathname) return null;
+    // An ssh:// remote can carry an alias too; an https one is already a real hostname.
+    const host = url.protocol === "ssh:" ? resolveHost(url.hostname) : url.host;
     // Drop any embedded credentials — these end up in a document handed to other people.
-    return `https://${url.host}/${pathname}`;
+    return `https://${host}/${pathname}`;
   } catch {
     return null;
   }

@@ -671,14 +671,14 @@ describe("repo provenance, derived not hardcoded", () => {
   // from the remote of the repo the *source file* lives in.
   it("normalises the scp-style remote git actually hands back for an SSH clone", () => {
     assert.equal(
-      normaliseRemoteUrl("git@github.com:acme/widgets.git"),
+      normaliseRemoteUrl("git@github.com:acme/widgets.git", (h) => h),
       "https://github.com/acme/widgets",
     );
   });
 
   it("normalises an ssh:// remote", () => {
     assert.equal(
-      normaliseRemoteUrl("ssh://git@github.com/acme/widgets.git"),
+      normaliseRemoteUrl("ssh://git@github.com/acme/widgets.git", (h) => h),
       "https://github.com/acme/widgets",
     );
   });
@@ -687,9 +687,31 @@ describe("repo provenance, derived not hardcoded", () => {
     assert.equal(normaliseRemoteUrl("https://github.com/acme/widgets.git/"), "https://github.com/acme/widgets");
   });
 
+  // Multi-account git clones through a ~/.ssh/config alias, and the alias is not a hostname.
+  it("resolves an SSH host alias to the real hostname", () => {
+    const aliases: Record<string, string> = { "github.motin": "github.com" };
+    const resolve = (host: string) => aliases[host] ?? host;
+    assert.equal(
+      normaliseRemoteUrl("git@github.motin:generativereality/cctabs.git", resolve),
+      "https://github.com/generativereality/cctabs",
+    );
+    assert.equal(
+      normaliseRemoteUrl("ssh://git@github.motin/generativereality/cctabs.git", resolve),
+      "https://github.com/generativereality/cctabs",
+    );
+  });
+
+  it("leaves an https host alone — it is already a real hostname", () => {
+    const explode = () => assert.fail("https remotes must not be run through the ssh resolver");
+    assert.equal(
+      normaliseRemoteUrl("https://github.com/acme/widgets.git", explode),
+      "https://github.com/acme/widgets",
+    );
+  });
+
   it("keeps a self-hosted host and a nested group path", () => {
     assert.equal(
-      normaliseRemoteUrl("git@gitlab.example.com:group/sub/widgets.git"),
+      normaliseRemoteUrl("git@gitlab.example.com:group/sub/widgets.git", (h) => h),
       "https://gitlab.example.com/group/sub/widgets",
     );
   });
@@ -704,7 +726,7 @@ describe("repo provenance, derived not hardcoded", () => {
   it("returns null for remotes there is no browsable URL for", () => {
     assert.equal(normaliseRemoteUrl(""), null);
     assert.equal(normaliseRemoteUrl("   "), null);
-    assert.equal(normaliseRemoteUrl("/srv/git/widgets.git"), null);
+    assert.equal(normaliseRemoteUrl("/srv/git/widgets.git", (h) => h), null);
     assert.equal(normaliseRemoteUrl("file:///srv/git/widgets.git"), null);
   });
 
