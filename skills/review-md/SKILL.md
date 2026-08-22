@@ -8,6 +8,11 @@ description: >
   pack", "re-render the pre-reads", "PDF of this doc", "print this doc", "make a pre-read out
   of this", "styled version for the meeting", "put this on screen", "share this doc with
   marketing / outside the team", or names a doc plus "HTML" / "PDF" / "screen-share".
+  ALSO use it when the operator wants a rendered doc as a **Claude Artifact** or a link —
+  "make this an artifact", "so I can review it on my phone", "give me a URL for this doc",
+  "publish this doc", "read it on mobile" — because `--artifact` emits exactly the body-level
+  HTML the Artifact host wants, and hand-authoring a page from the same markdown throws away
+  the render.
   Documents the design contract (callout glyph mapping, type scale, tokens) so renders stay
   consistent. NOT for slide decks — a deck is a different job and a different tool.
 ---
@@ -243,6 +248,20 @@ an accent that fails contrast in half the renders is a bug only some readers see
 the screen is doing.
 
 ### Publishing to a Claude Artifact
+
+⚠️ **When the operator asks for "an artifact" of a doc that exists as markdown, reach for this
+first — not a hand-authored page.** The pull the other way is strong: a request for an artifact
+loads `artifact-design`, which asks you to *design* a page, and designing one from the same
+markdown is a perfectly reasonable thing to do when nothing else exists. Something else does now.
+
+Use `--artifact` when the operator wants **this document, on a phone or behind a link** — the
+render they already reviewed, faithfully, in seconds. Hand-author only when they want a
+**different artefact**: a designed adaptation that reorders the content, adds a verdict panel,
+annotates a table, or otherwise makes editorial decisions the markdown does not contain. That is
+real work with a real reason; it is just not what "so I can read it on my phone" is asking for.
+Two tells that `--artifact` is what is wanted: the doc has already been rendered once, and the
+operator is asking for a *destination* rather than a treatment.
+
 
 ```bash
 review-md docs/PLAN.md --artifact -o plan.html
