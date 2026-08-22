@@ -169,18 +169,52 @@ const CALLOUT_COLORS: Record<CalloutKind, { bg: string; ink: string; rule: strin
   zap: { bg: "#e2ebef", ink: "#1f4f63", rule: "#95b6c4" },
 };
 
+/**
+ * The same seven kinds for a dark ground.
+ *
+ * These were the one part of the page dark mode missed, and the failure was ugly rather than
+ * subtle: the tints above are opaque *light* fills, so a callout kept its cream background while
+ * the text inside inherited `--ink` — which is near-white in dark mode. White on pale yellow,
+ * unreadable. Worse, only the leading `<strong>` stayed legible, because it takes the kind's own
+ * dark `ink`, so the box looked like it had a first line and then nothing.
+ *
+ * The lesson is in how it survived: every OTHER colour reached the dark palette because it went
+ * through `var(--…)`, and these did not because they were written straight into the rule text by
+ * `calloutCss()`. So the fix is not a second hardcoded table — it is to put these on custom
+ * properties too, emitted by the same `palette()` writer as everything else, so a kind added to
+ * one theme and forgotten in the other cannot compile.
+ */
+const CALLOUT_COLORS_DARK: Record<CalloutKind, { bg: string; ink: string; rule: string }> = {
+  star: { bg: "#2f2717", ink: "#e6c67d", rule: "#7d6631" },
+  flag: { bg: "#33211c", ink: "#e79079", rule: "#8a4a38" },
+  warn: { bg: "#302518", ink: "#e0b483", rule: "#7d5a33" },
+  stop: { bg: "#331a1a", ink: "#eb9a95", rule: "#8a4340" },
+  parked: { bg: "#26231a", ink: "#bab1a0", rule: "#5c5648" },
+  done: { bg: "#1f2a1d", ink: "#a9c79b", rule: "#4e6647" },
+  zap: { bg: "#1a2831", ink: "#98c3d7", rule: "#44697c" },
+};
+
+/** The callout tints as custom properties, so both themes go through `palette()`. */
+function calloutTokens(colors: typeof CALLOUT_COLORS): string {
+  return (Object.keys(CALLOUTS) as CalloutKind[])
+    .map((kind) => {
+      const { bg, ink, rule } = colors[kind];
+      return `  --co-${kind}-bg:${bg}; --co-${kind}-ink:${ink}; --co-${kind}-rule:${rule};`;
+    })
+    .join("\n");
+}
+
 function calloutCss(): string {
   const kinds = Object.keys(CALLOUTS) as CalloutKind[];
   return kinds
-    .map((kind) => {
-      const { bg, ink, rule } = CALLOUT_COLORS[kind];
-      return [
-        `.callout-${kind}{background:${bg}; border-left-color:${rule}}`,
-        `.callout-${kind} > strong:first-of-type{color:${ink}}`,
-        `.badge-${kind}{background:${bg}; color:${ink}; border-color:${rule}}`,
-        `.mark-${kind}{color:${ink}}`,
-      ].join("\n");
-    })
+    .map((kind) =>
+      [
+        `.callout-${kind}{background:var(--co-${kind}-bg); border-left-color:var(--co-${kind}-rule)}`,
+        `.callout-${kind} > strong:first-of-type{color:var(--co-${kind}-ink)}`,
+        `.badge-${kind}{background:var(--co-${kind}-bg); color:var(--co-${kind}-ink); border-color:var(--co-${kind}-rule)}`,
+        `.mark-${kind}{color:var(--co-${kind}-ink)}`,
+      ].join("\n"),
+    )
     .join("\n");
 }
 
@@ -193,7 +227,8 @@ function palette(t: typeof TOKENS | typeof DARK): string {
   --rule:${t.rule}; --rule-soft:${t.ruleSoft};
   --banner-bg:${t.bannerBg}; --banner-fg:${t.bannerFg}; --banner-accent:${t.bannerAccent};
   --link-rule:${t.linkRule}; --ghost-ink:${t.ghostInk};
-  --dot:${t.dot}; --dot-soft:${t.dotSoft};`;
+  --dot:${t.dot}; --dot-soft:${t.dotSoft};
+${calloutTokens(t === TOKENS ? CALLOUT_COLORS : CALLOUT_COLORS_DARK)}`;
 }
 
 function styles(embedFonts: boolean): string {

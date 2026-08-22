@@ -432,6 +432,46 @@ describe("the whole page", () => {
     assert.ok(h2 && Number(h2[1]) < 1.6, `h2 should stay under 1.6rem, got ${h2?.[1]}rem`);
   });
 
+  /**
+   * Every screen colour must reach dark mode, and the only way it does is `var(--…)`.
+   *
+   * The callout tints failed exactly this and shipped broken: they were written straight into the
+   * rule text, so a callout kept its cream background while the text inside inherited an --ink
+   * that had gone near-white. Unreadable, and only in dark mode, which is the half nobody renders
+   * while writing the doc.
+   *
+   * `@media print` is exempt on purpose — paper is white whatever the screen is doing — and so are
+   * the `:root` token declarations, which are where literals are supposed to live.
+   */
+  it("declares no literal colour outside :root and @media print", () => {
+    const css = /<style>([\s\S]*?)<\/style>/.exec(built())?.[1] ?? "";
+    const printAt = css.indexOf("@media print");
+    const screen = printAt === -1 ? css : css.slice(0, printAt);
+    const offenders = screen
+      .split("\n")
+      .filter((line) => !/^\s*--/.test(line) && !line.includes("@font-face") && !line.includes("base64"))
+      .flatMap((line) => {
+        const found = line.match(/(?<!\w)(#[0-9a-fA-F]{3,8}|rgba?\([^)]*\))/g) ?? [];
+        return found.map((colour) => `${colour} in: ${line.trim().slice(0, 70)}`);
+      });
+    assert.deepEqual(offenders, [], `these colours can never follow the theme:\n${offenders.join("\n")}`);
+  });
+
+  it("gives every callout kind a dark tint as well as a light one", () => {
+    const css = /<style>([\s\S]*?)<\/style>/.exec(built())?.[1] ?? "";
+    for (const kind of ["star", "flag", "warn", "stop", "parked", "done", "zap"]) {
+      const declared = css.match(new RegExp(`--co-${kind}-bg:`, "g")) ?? [];
+      assert.ok(
+        declared.length >= 3,
+        `--co-${kind}-bg needs a light value plus both dark blocks, saw ${declared.length}`,
+      );
+      assert.ok(
+        css.includes(`.callout-${kind}{background:var(--co-${kind}-bg)`),
+        `.callout-${kind} must read its tint through the token, not a literal`,
+      );
+    }
+  });
+
   it("escapes the title into <title> rather than emitting its markup", () => {
     const html = page({
       title: "A <em>B</em> & C",
