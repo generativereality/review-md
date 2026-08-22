@@ -177,7 +177,7 @@ be sized from the text actually inside it. What that buys, and what it costs:
 
 | Thing                      | Why it is that way                                                                                                                                                                         |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Needs a Chromium           | `playwright-core` reuses whatever is already in the shared Playwright cache — no second download. Missing? The error says so: `npx playwright install chromium`, or `--no-diagrams`.       |
+| Needs a Chromium           | mermaid measures its own layout, so a real browser is required (jsdom has none). Resolved in order: `REVIEW_MD_CHROMIUM`, the Playwright cache, then a stock Chrome / Chromium / Edge / Brave. If Chrome is installed there is nothing to install. Else `npx playwright install chromium`, or `--no-diagrams`. |
 | One browser launch per run | Every diagram in every doc of a pack renders in a single launch, so a 12-doc pack pays ~1s of fixed cost once.                                                                             |
 | `htmlLabels: false`        | Labels are `<text>`, never HTML in a `<foreignObject>` — the foreignObject kind is the one that comes out blank when the page is printed.                                                  |
 | Deterministic element ids  | `mmd-<doc>-<block>`. mermaid scopes its generated CSS and arrowhead markers under the id, so two diagrams on a page must not share one, and a random id would make every re-render a diff. |
@@ -231,6 +231,31 @@ the footnote check, so `--strict` fails on it. If a diagram renders as a code bl
   watermark drop out (**and the grid un-grids with them**, or the body prints two-thirds width
   against a blank strip), callouts/tables/rows don't split across pages, `thead` repeats, external
   link targets print inline.
+
+### Light and dark
+
+The palette is token-level, and both themes are defined from the same writer, so they cannot
+drift. Readers get their system theme; an explicit `data-theme="light"|"dark"` on the root wins
+over it in both directions. The accent lightens for dark (`#8c2f1b` is ~2.1:1 on a dark ground —
+an accent that fails contrast in half the renders is a bug only some readers see).
+
+`@media print` is deliberately exempt and keeps its own hardcoded values: paper is white whatever
+the screen is doing.
+
+### Publishing to a Claude Artifact
+
+```bash
+review-md docs/PLAN.md --artifact -o plan.html
+```
+
+`--artifact` emits **body-level HTML only** — no `<!doctype>`, `<html>`, `<head>` or `<body>`,
+because the Artifact host supplies those and wraps what it is given; our own shell would nest a
+second document inside the first. The `<title>` is kept, since the host reads it to name the tab
+and the gallery card. Everything else is identical to a normal render.
+
+This works at all because self-containment was already the design: the Artifact sandbox blocks
+every external host, and this renderer inlines its CSS, its woff2 subsets, and its diagrams as
+SVG. Nothing is given up to publish one — and the result opens on a phone, which is the point.
 
 ## Repo-awareness — derived, never hardcoded
 

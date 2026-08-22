@@ -1,6 +1,6 @@
 {
   "name": "@generativereality/review-md",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Markdown → one self-contained styled HTML file (and a sane PDF). Build-time mermaid→inline-SVG, glyph callouts, footnote-integrity checking, jump rail, print stylesheet, pack manifests. Repo-agnostic CLI + Claude Code plugin.",
   "type": "module",
   "bin": {

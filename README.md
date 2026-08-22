@@ -9,6 +9,7 @@ npm install -g @generativereality/review-md
 
 review-md docs/PLAN.md                      # → rendered-docs/PLAN.html
 review-md --manifest packs/planning.json    # a whole pack + its index.html
+review-md docs/PLAN.md --artifact           # body-level HTML, for a Claude Artifact
 ```
 
 Markdown is the right source of truth. It is a poor artifact to put on a screen in a meeting.
@@ -31,6 +32,13 @@ This closes that gap without asking you to leave markdown.
   no definition — each of which every other renderer swallows silently. `--strict` makes them fail.
 - **A real print stylesheet.** Banner collapses, rail drops out, tables and callouts don't split
   across pages, `thead` repeats, external link targets print inline.
+- **Light and dark.** The palette follows the reader's system theme, or an explicit
+  `data-theme` if something set one. Print is deliberately exempt — paper is white whatever the
+  screen is doing, and a dark-mode PDF is a ruined one.
+- **`--artifact` mode.** Emits body-level HTML for publishing as a Claude Artifact, so a doc gets
+  a URL that opens on a phone. The artifact sandbox blocks every external host, which is exactly
+  the constraint this renderer was already built for — the CSS, fonts and diagrams are inline, so
+  nothing has to be given up to publish one.
 - **Packs.** A JSON manifest renders a whole set in one command, generates an `index.html` cover,
   and cross-links the docs to each other — so the output folder is navigable on its own.
 
@@ -53,8 +61,12 @@ derived from the source document's own `git remote`, and a doc outside any repo 
 npm install -g @generativereality/review-md
 ```
 
-**Requirements:** Node.js 22+. Diagrams additionally need a Chromium in the shared Playwright
-cache — `npx playwright install chromium` if you don't have one, or pass `--no-diagrams`.
+**Requirements:** Node.js 22+. Diagrams additionally need **a Chromium-family browser**, because
+mermaid measures its own layout (`getBBox`, `getComputedTextLength`) and jsdom has none. Any of
+these is fine, and they are tried in this order: `REVIEW_MD_CHROMIUM=/path/to/chrome`, a Chromium
+in the shared Playwright cache, or a stock **Chrome / Chromium / Edge / Brave** in its usual
+location. If you have Chrome, you already have what this needs — there is nothing to install.
+Failing all of those, `npx playwright install chromium`, or pass `--no-diagrams`.
 
 <details>
 <summary><b><code>review-md: command not found</code> after a clean install</b></summary>
