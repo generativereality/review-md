@@ -216,10 +216,39 @@ function buildMarkdownIt(options: RenderOptions): { md: MarkdownIt; toc: TocEntr
   return { md, toc };
 }
 
+/**
+ * Remove a leading YAML frontmatter block.
+ *
+ * Without this, frontmatter does not merely show up — it **silently corrupts the jump rail**, and
+ * the render still exits 0 with a ✓. markdown-it has no frontmatter rule, so the closing `---`
+ * reads as a setext underline and the whole YAML block becomes an H2. That heading is swallowed
+ * near the masthead, so it never appears in the body, but it IS in the rail: entry #1 becomes the
+ * entire frontmatter under a ~2KB slugified href, every section number below it is off by one
+ * against the body, and the last entry loses its number. Clicking §5 lands the reader on §4.
+ *
+ * Nothing warns, not even `--strict` — the only way to see it is to open the render.
+ *
+ * Anchored at byte 0 on purpose: a `---` thematic break anywhere in the body is ordinary markdown
+ * and must survive untouched. Requires the opening fence to be the very first line, the closing
+ * fence to be on its own line, and tolerates CRLF.
+ *
+ * Reported 2026-08-22 against 0.1.3, from a vault where every draft carries frontmatter because
+ * the authoring skill mandates it — which is also true of Obsidian, Jekyll, Hugo and Astro
+ * content directories, i.e. exactly the documents this renders.
+ */
+export function stripFrontmatter(markdown: string): string {
+  const match = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/.exec(markdown);
+  if (!match) return markdown;
+  // Keep the line count stable so any future line-numbered diagnostic still points at the right
+  // line of the SOURCE file, not the stripped copy.
+  const blanks = "\n".repeat(match[0].replace(/[^\n]/g, "").length);
+  return blanks + markdown.slice(match[0].length);
+}
+
 export function renderMarkdown(markdown: string, options: RenderOptions): RenderedDoc {
   const { md, toc } = buildMarkdownIt(options);
   const env: Record<string, unknown> = {};
-  const tokens = md.parse(markdown, env);
+  const tokens = md.parse(stripFrontmatter(markdown), env);
 
   // Split at the structural seams: H1 → masthead title, everything up to the first H2 →
   // standfirst, the rest → body.

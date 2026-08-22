@@ -12,7 +12,7 @@ import {
   renderDiagramBatch,
   type MermaidPage,
 } from "./mermaid.ts";
-import { renderMarkdown, type RenderOptions } from "./render.ts";
+import { renderMarkdown, stripFrontmatter, type RenderOptions } from "./render.ts";
 import { diagramTheme, page, TOKENS } from "./theme.ts";
 
 const ROOT = "/repo";
@@ -333,6 +333,50 @@ describe("link rewriting", () => {
     assert.match(body, /href="https:\/\/example\.com\/"/);
     assert.match(body, /href="#section"/);
     assert.match(body, /href="\.\.\/design\/deck\.html"/);
+  });
+});
+
+describe("YAML frontmatter", () => {
+  const FM = ['---', 'title: "A doc"', 'status: draft', '---', '', '# A doc', '', '## One', '', 'Body.', ''].join("\n");
+
+  it("strips a leading block so it cannot become a setext heading", () => {
+    assert.ok(!stripFrontmatter(FM).includes("status: draft"));
+    assert.ok(stripFrontmatter(FM).includes("# A doc"));
+  });
+
+  /** The whole bug: the swallowed H2 never reaches the body but does reach the rail, so the
+   *  numbering silently drifts and every rail link lands one section early. */
+  it("keeps the jump rail aligned with the body", () => {
+    const rendered = render(FM + "\n## Two\n\nMore.\n");
+    // Labels carry the section number, so assert on both halves: the rail must begin at the
+    // FIRST real H2 and number it §1. The bug made this "§1 title: …" with the body's §1 below it.
+    assert.equal(rendered.toc[0]?.label, "§1 One", `rail should start at the first real H2 as §1, got ${rendered.toc[0]?.label}`);
+    assert.equal(rendered.toc[1]?.label, "§2 Two", "the second section must be §2, not §3");
+    assert.ok(
+      !rendered.toc.some((e) => e.label.includes("status")),
+      "frontmatter must never appear as a rail entry",
+    );
+    assert.ok(
+      rendered.toc.every((e) => e.slug.length < 60),
+      "a rail href this long means the YAML was slugified into it",
+    );
+  });
+
+  /** `---` is ordinary markdown below byte 0, and stripping one there would eat real content. */
+  it("leaves a body-level thematic break alone", () => {
+    const doc = "# T\n\n## One\n\nBefore.\n\n---\n\nAfter.\n";
+    assert.equal(stripFrontmatter(doc), doc);
+  });
+
+  it("leaves a doc without frontmatter byte-identical", () => {
+    const doc = "# T\n\n## One\n\nBody.\n";
+    assert.equal(stripFrontmatter(doc), doc);
+  });
+
+  it("keeps the source line numbers stable", () => {
+    const before = FM.slice(0, FM.indexOf("# A doc")).split("\n").length;
+    const after = stripFrontmatter(FM).slice(0, stripFrontmatter(FM).indexOf("# A doc")).split("\n").length;
+    assert.equal(after, before, "stripping must not shift what line the body starts on");
   });
 });
 

@@ -15,6 +15,8 @@
  */
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import updateNotifier from "update-notifier";
+import PKG from "../package.json" with { type: "json" };
 import path from "node:path";
 import { parseArgs } from "node:util";
 
@@ -386,6 +388,24 @@ async function main(): Promise<void> {
 
 // An unhandled rejection exits 0 on some Node versions, and a renderer that reports success
 // having written nothing is worse than one that crashes.
+// Non-blocking daily update check, plus our own one-line warning.
+//
+// `notifier.notify()` prints its boxed banner only on a TTY, and the caller here usually is not
+// one: an agent shells out, captures stdout, and would otherwise never learn it is driving an old
+// build — it just gets the old behaviour and concludes the tool cannot do the thing. That failure
+// is invisible from inside the session, so the plain line matters more than the pretty box.
+//
+// Same shape and prefix as cctabs on purpose: the same agents drive both, and a warning they
+// already recognise costs nothing to read.
+const notifier = updateNotifier({ pkg: { name: PKG.name, version: PKG.version } });
+notifier.notify();
+if (notifier.update && notifier.update.latest !== notifier.update.current) {
+  const { current, latest } = notifier.update;
+  process.stdout.write(
+    `[review-md] OUTDATED ${current} < ${latest} — run: npm install -g ${PKG.name}@latest\n`,
+  );
+}
+
 main().catch((error: unknown) => {
   console.error(error instanceof Error ? `✗ ${error.message}` : error);
   process.exitCode = 1;
