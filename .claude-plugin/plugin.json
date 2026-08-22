@@ -1,0 +1,11 @@
+{
+  "name": "render-doc",
+  "description": "Markdown → one self-contained styled HTML file (and a sane PDF) via the `render-doc` CLI. Build-time mermaid→inline-SVG, glyph callouts, footnote-integrity checking, sticky jump rail, print stylesheet, pack manifests. Repo-agnostic.",
+  "version": "0.1.0",
+  "author": {
+    "name": "generativereality"
+  },
+  "repository": "https://github.com/generativereality/render-doc",
+  "homepage": "https://github.com/generativereality/render-doc",
+  "license": "MIT"
+}

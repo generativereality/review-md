@@ -1,0 +1,67 @@
+{
+  "name": "@generativereality/render-doc",
+  "version": "0.1.0",
+  "description": "Markdown → one self-contained styled HTML file (and a sane PDF). Build-time mermaid→inline-SVG, glyph callouts, footnote-integrity checking, jump rail, print stylesheet, pack manifests. Repo-agnostic CLI + Claude Code plugin.",
+  "type": "module",
+  "bin": {
+    "render-doc": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    ".claude-plugin",
+    "skills"
+  ],
+  "scripts": {
+    "dev": "tsx ./src/index.ts",
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test src/render-doc.test.ts",
+    "check": "npm run typecheck && npm run test && npm run build",
+    "release": "bumpp && npm publish",
+    "sync-plugin": "bash scripts/sync-plugin.sh",
+    "prepack": "npm run build"
+  },
+  "keywords": [
+    "claude-code",
+    "markdown",
+    "html",
+    "mermaid",
+    "documentation",
+    "pdf",
+    "static-site",
+    "ai-agents"
+  ],
+  "author": "motin",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/generativereality/render-doc.git"
+  },
+  "homepage": "https://github.com/generativereality/render-doc",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  },
+  "dependencies": {
+    "@fontsource-variable/fraunces": "^5.3.0",
+    "@fontsource/ibm-plex-mono": "^5.3.0",
+    "@fontsource/ibm-plex-sans": "^5.3.0",
+    "markdown-it": "^14.2.0",
+    "markdown-it-anchor": "^9.2.1",
+    "markdown-it-footnote": "^4.0.0",
+    "mermaid": "^11.17.0",
+    "playwright-core": "^1.61.0"
+  },
+  "devDependencies": {
+    "@types/markdown-it": "14.1.2",
+    "@types/markdown-it-footnote": "^3.0.4",
+    "@types/node": "^22.17.2",
+    "bumpp": "^9.11.1",
+    "tsdown": "^0.12.0",
+    "tsx": "^4.19.1",
+    "typescript": "^5.9.3"
+  }
+}

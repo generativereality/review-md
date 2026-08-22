@@ -1,0 +1,21 @@
+{
+  "include": ["src/**/*"],
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "target": "ES2022",
+    // `bundler`, not `nodenext`: @types/markdown-it ships both a CJS and an ESM entry, and
+    // @types/markdown-it-footnote pulls in the CJS one via `import = require`. Under nodenext
+    // those are two structurally different `MarkdownIt` types and `md.use(footnote)` does not
+    // typecheck. tsdown bundles this anyway, so bundler resolution is what actually ships.
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": false,
+    "noEmit": true
+  }
+}
