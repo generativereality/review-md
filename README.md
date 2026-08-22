@@ -1,14 +1,14 @@
-# render-doc
+# review-md
 
 **Markdown → one self-contained, styled HTML file.** No build step, no network, no assets folder —
 a single `.html` you can email, screen-share, or open from a USB stick on someone else's laptop.
 `Cmd-P` gives a sane PDF.
 
 ```bash
-npm install -g @generativereality/render-doc
+npm install -g @generativereality/review-md
 
-render-doc docs/PLAN.md                      # → rendered-docs/PLAN.html
-render-doc --manifest packs/planning.json    # a whole pack + its index.html
+review-md docs/PLAN.md                      # → rendered-docs/PLAN.html
+review-md --manifest packs/planning.json    # a whole pack + its index.html
 ```
 
 Markdown is the right source of truth. It is a poor artifact to put on a screen in a meeting.
@@ -43,36 +43,36 @@ derived from the source document's own `git remote`, and a doc outside any repo 
 
 ```
 ❯ /plugin marketplace add generativereality/plugins
-❯ /plugin install render-doc@generativereality
+❯ /plugin install review-md@generativereality
 ❯ /reload-plugins
 ```
 
 **Via npm** (CLI only):
 
 ```bash
-npm install -g @generativereality/render-doc
+npm install -g @generativereality/review-md
 ```
 
 **Requirements:** Node.js 22+. Diagrams additionally need a Chromium in the shared Playwright
 cache — `npx playwright install chromium` if you don't have one, or pass `--no-diagrams`.
 
 <details>
-<summary><b><code>render-doc: command not found</code> after a clean install</b></summary>
+<summary><b><code>review-md: command not found</code> after a clean install</b></summary>
 
 Almost always the **npm prefix**, not a failed install: `npm -g` writes to `$(npm prefix -g)/bin`,
 and a custom `prefix=` in `~/.npmrc` puts that somewhere your shell doesn't search. Check with
 `npm prefix -g`, then put that `bin` directory on `PATH`.
 
 If you install from a registry mirror rather than npmjs, note the package name is **scoped** — a
-bare `render-doc` will 404.
+bare `review-md` will 404.
 
 </details>
 
 ## Usage
 
 ```
-render-doc <src.md> [dst.html] [options]
-render-doc --manifest <pack.json> [options]
+review-md <src.md> [dst.html] [options]
+review-md --manifest <pack.json> [options]
 ```
 
 | Flag                    | Effect                                                             |
@@ -95,7 +95,7 @@ render-doc --manifest <pack.json> [options]
 ### ⛔ A second path is the DESTINATION, not a second source
 
 ```bash
-render-doc docs/A.md docs/B.md      # writes rendered HTML *over* docs/B.md
+review-md docs/A.md docs/B.md      # writes rendered HTML *over* docs/B.md
 ```
 
 There is no multi-file form. It exits 0 and logs one cheerful `✓ docs/B.md`, which reads as
@@ -116,7 +116,7 @@ There is no multi-file form. It exits 0 and logs one cheerful `✓ docs/B.md`, w
 ```
 
 ```bash
-render-doc --manifest packs/planning.json --strict
+review-md --manifest packs/planning.json --strict
 ```
 
 `src` and `outDir` resolve against the repo root (or the cwd, outside a repo). Per-doc keys
@@ -143,7 +143,7 @@ it. Change the look there and every render moves together; never hand-edit an ou
 | `--rail` / `--gutter`           | `16rem` / `2.4rem`                | jump rail, and its gutter   |
 
 Fraunces for display, IBM Plex Sans for body, IBM Plex Mono for anything structural. Full type
-scale and callout mapping: [`skills/render-doc/SKILL.md`](skills/render-doc/SKILL.md).
+scale and callout mapping: [`skills/review-md/SKILL.md`](skills/review-md/SKILL.md).
 
 ### Callout glyphs
 

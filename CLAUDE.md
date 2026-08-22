@@ -1,7 +1,7 @@
-# render-doc
+# review-md
 
-Markdown → one self-contained styled HTML file (`@generativereality/render-doc`, bin `render-doc`).
-See `README.md` and `skills/render-doc/SKILL.md` — the SKILL is the design contract and the list of
+Markdown → one self-contained styled HTML file (`@generativereality/review-md`, bin `review-md`).
+See `README.md` and `skills/review-md/SKILL.md` — the SKILL is the design contract and the list of
 traps; read it before changing behaviour.
 
 ## Versioning policy — READ THIS
@@ -71,6 +71,6 @@ before any `gh` call against `generativereality/*`.
   is an ordinary outcome, and the renderer must still produce a document.
 - `src/footnotes.ts` — the integrity check (duplicate / orphaned / undefined).
 - `src/manifest.ts` — pack manifests and the generated `index.html` cover.
-- `src/render-doc.test.ts` — the whole suite (`npm test`).
-- `skills/render-doc/SKILL.md` — the Claude Code skill (synced to `generativereality/plugins`).
+- `src/review-md.test.ts` — the whole suite (`npm test`).
+- `skills/review-md/SKILL.md` — the Claude Code skill (synced to `generativereality/plugins`).
 - `.claude-plugin/plugin.json` — manifest; version must match `package.json`.

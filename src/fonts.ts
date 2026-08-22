@@ -89,7 +89,7 @@ export function fontFaceCss(): string {
       data = readFileSync(require_.resolve(face.spec));
     } catch {
       console.warn(
-        `⚠ render-doc: font ${face.spec} not resolvable — falling back to system fonts. Reinstall render-doc, or pass --no-fonts to skip embedding.`,
+        `⚠ review-md: font ${face.spec} not resolvable — falling back to system fonts. Reinstall review-md, or pass --no-fonts to skip embedding.`,
       );
       cached = "";
       return cached;

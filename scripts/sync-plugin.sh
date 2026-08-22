@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sync render-doc plugin files to the generativereality/plugins marketplace repo.
+# Sync review-md plugin files to the generativereality/plugins marketplace repo.
 #
 # Usage:
 #   ./scripts/sync-plugin.sh          # sync + commit + push
@@ -24,12 +24,12 @@ ERRORS=0
 
 # Files that ship inside the plugin payload. Relative to repo root.
 PAYLOAD_FILES=(
-  "skills/render-doc/SKILL.md"
+  "skills/review-md/SKILL.md"
   ".claude-plugin/plugin.json"
 )
 
 for rel in "${PAYLOAD_FILES[@]}"; do
-  if ! diff -q "$REPO_ROOT/$rel" "$PLUGINS_DIR/plugins/render-doc/$rel" >/dev/null 2>&1; then
+  if ! diff -q "$REPO_ROOT/$rel" "$PLUGINS_DIR/plugins/review-md/$rel" >/dev/null 2>&1; then
     echo "MISMATCH: $rel differs from plugins repo"
     ERRORS=1
   fi
@@ -46,18 +46,18 @@ if [ "$CHECK_ONLY" = true ]; then
 fi
 
 for rel in "${PAYLOAD_FILES[@]}"; do
-  mkdir -p "$(dirname "$PLUGINS_DIR/plugins/render-doc/$rel")"
-  cp -p "$REPO_ROOT/$rel" "$PLUGINS_DIR/plugins/render-doc/$rel"
+  mkdir -p "$(dirname "$PLUGINS_DIR/plugins/review-md/$rel")"
+  cp -p "$REPO_ROOT/$rel" "$PLUGINS_DIR/plugins/review-md/$rel"
 done
 
 cd "$PLUGINS_DIR"
-if git diff --quiet && [ -z "$(git status --porcelain plugins/render-doc)" ]; then
+if git diff --quiet && [ -z "$(git status --porcelain plugins/review-md)" ]; then
   echo "Plugins repo already up to date"
   exit 0
 fi
 
-git add plugins/render-doc
-git commit -m "chore: sync render-doc plugin"
+git add plugins/review-md
+git commit -m "chore: sync review-md plugin"
 git push
 
-echo "Synced render-doc to plugins repo"
+echo "Synced review-md to plugins repo"

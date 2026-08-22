@@ -5,7 +5,7 @@ name: Release
 # below were all paid for there, on 2026-08-22.
 #
 # ⚠️ **npm trusts this workflow by FILENAME.** Package → Settings → Trusted
-# Publisher names `generativereality/render-doc` + `release.yml`, so renaming this
+# Publisher names `generativereality/review-md` + `release.yml`, so renaming this
 # file silently breaks releases until npm is updated to match.
 #
 # ⚠️ **This package has never been published.** npm's Trusted Publisher UI lives

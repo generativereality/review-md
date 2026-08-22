@@ -1,10 +1,10 @@
 {
-  "name": "@generativereality/render-doc",
+  "name": "@generativereality/review-md",
   "version": "0.1.0",
   "description": "Markdown → one self-contained styled HTML file (and a sane PDF). Build-time mermaid→inline-SVG, glyph callouts, footnote-integrity checking, jump rail, print stylesheet, pack manifests. Repo-agnostic CLI + Claude Code plugin.",
   "type": "module",
   "bin": {
-    "render-doc": "dist/index.js"
+    "review-md": "dist/index.js"
   },
   "files": [
     "dist",
@@ -15,7 +15,7 @@
     "dev": "tsx ./src/index.ts",
     "build": "tsdown",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test src/render-doc.test.ts",
+    "test": "tsx --test src/review-md.test.ts",
     "check": "npm run typecheck && npm run test && npm run build",
     "release": "bumpp && npm publish",
     "sync-plugin": "bash scripts/sync-plugin.sh",
@@ -35,9 +35,9 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/generativereality/render-doc.git"
+    "url": "git+https://github.com/generativereality/review-md.git"
   },
-  "homepage": "https://github.com/generativereality/render-doc",
+  "homepage": "https://github.com/generativereality/review-md",
   "engines": {
     "node": ">=22.0.0"
   },

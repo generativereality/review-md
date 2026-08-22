@@ -162,7 +162,7 @@ function buildMarkdownIt(options: RenderOptions): { md: MarkdownIt; toc: TocEntr
 
   // Numeric cells get tabular figures — these docs are table-heavy and columns of € and %
   // read badly proportional.
-  md.core.ruler.push("render_doc_numeric_cells", (state) => {
+  md.core.ruler.push("review_md_numeric_cells", (state) => {
     const tokens = state.tokens;
     for (let i = 0; i < tokens.length; i += 1) {
       if (tokens[i].type !== "td_open") continue;
@@ -178,7 +178,7 @@ function buildMarkdownIt(options: RenderOptions): { md: MarkdownIt; toc: TocEntr
   // past, is what keeps the ordinal correct: the renderer is handed *slices* of the stream (the
   // standfirst, then the body) and never sees anything above the H1 at all, so a running counter
   // would drift the moment a doc opened with a diagram.
-  md.core.ruler.push("render_doc_mermaid_index", (state) => {
+  md.core.ruler.push("review_md_mermaid_index", (state) => {
     let index = 0;
     for (const token of state.tokens) {
       if (token.type !== "fence" || !isMermaidFence(token.info)) continue;

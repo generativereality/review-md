@@ -185,7 +185,7 @@ function takeTaskMarker(inline: Token): boolean | null {
 export function calloutsPlugin(md: {
   core: { ruler: { push: (name: string, fn: (state: { tokens: Token[] }) => void) => void } };
 }): void {
-  md.core.ruler.push("render_doc_callouts", (state) => {
+  md.core.ruler.push("review_md_callouts", (state) => {
     const tokens = state.tokens;
 
     for (let i = 0; i < tokens.length; i += 1) {

@@ -1,9 +1,9 @@
 ---
-name: render-doc
+name: review-md
 description: >
   Turn any markdown doc into a single self-contained styled HTML file (and a sane PDF) for
   screen-share, a meeting pre-read, or handing to someone outside the team. Runs the
-  `render-doc` CLI; batch-renders a whole pack from a manifest. Use when the operator says
+  `review-md` CLI; batch-renders a whole pack from a manifest. Use when the operator says
   "render this doc as HTML", "make a styled version of X", "make X presentable", "render the
   pack", "re-render the pre-reads", "PDF of this doc", "print this doc", "make a pre-read out
   of this", "styled version for the meeting", "put this on screen", "share this doc with
@@ -12,7 +12,7 @@ description: >
   consistent. NOT for slide decks — a deck is a different job and a different tool.
 ---
 
-# render-doc — markdown → one styled, self-contained HTML file
+# review-md — markdown → one styled, self-contained HTML file
 
 Markdown is the source of truth, but a `.md` file is a poor artifact to put on a screen in a
 meeting or hand to someone outside the team. This renders any markdown doc into a **single
@@ -20,11 +20,11 @@ self-contained HTML file** that looks deliberate — one file, no network, opens
 on someone else's laptop.
 
 ```bash
-render-doc docs/PLAN.md
-render-doc docs/KPIS.md --kicker "Growth · KPI reference" \
+review-md docs/PLAN.md
+review-md docs/KPIS.md --kicker "Growth · KPI reference" \
   --banner-left "Weekly sync · Fri 2026-08-07" --banner-right "updated after the session"
-render-doc --manifest packs/planning.json     # a whole pack
-render-doc --help
+review-md --manifest packs/planning.json     # a whole pack
+review-md --help
 ```
 
 Output lands in **`rendered-docs/`** by default (`--out-dir` to move it). Treat it as derived —
@@ -38,7 +38,7 @@ gitignore it and re-render; don't archive renders next to the markdown they came
 ## Install
 
 ```bash
-npm install -g @generativereality/render-doc     # or: /plugin install render-doc@generativereality
+npm install -g @generativereality/review-md     # or: /plugin install review-md@generativereality
 ```
 
 ⛔ **`command not found` right after a clean `-g` install** is almost always the **npm prefix**,
@@ -47,7 +47,7 @@ not a failed install: `npm -g` writes into `$(npm prefix -g)/bin`, and a custom 
 `$(npm prefix -g)/bin` on `PATH`.
 
 ⚠️ If you install from a registry mirror rather than npmjs, the **scoped** name is the one that
-resolves — a bare `render-doc` 404s.
+resolves — a bare `review-md` 404s.
 
 ## When NOT to use this
 
@@ -65,11 +65,11 @@ exactly one document theme here — don't start a second.
 
 ## ⛔ It renders ONE doc — a second path is the DESTINATION, and it gets overwritten
 
-The signature is **`render-doc <src.md> [dst.html]`**. There is no multi-file form, so passing two
+The signature is **`review-md <src.md> [dst.html]`**. There is no multi-file form, so passing two
 sources —
 
 ```bash
-render-doc docs/A.md docs/B.md      # ⛔ writes HTML *over* docs/B.md
+review-md docs/A.md docs/B.md      # ⛔ writes HTML *over* docs/B.md
 ```
 
 — reads `A.md` and **writes the rendered HTML on top of `B.md`**, destroying it. It exits 0 and logs a single
@@ -79,7 +79,7 @@ outside `rendered-docs/`, and only **one** ✓ appears for two files.
 ⇒ **To render several docs, loop** (or use `--manifest` for a real pack):
 
 ```bash
-for f in A B; do render-doc "docs/$f.md"; done
+for f in A B; do review-md "docs/$f.md"; done
 ```
 
 ⚠️ **And commit before rendering anything uncommitted.** _(Hit for real: a brand-new, untracked
@@ -351,7 +351,7 @@ keep the markdown as the content of record.
 
 ## ⛔ Once a doc is in a pack, render the PACK — a single-file render silently strands its siblings
 
-`render-doc <one.md>` writes to `rendered-docs/<NAME>.html`, **not** into the pack's `outDir`. So
+`review-md <one.md>` writes to `rendered-docs/<NAME>.html`, **not** into the pack's `outDir`. So
 iterating on one doc leaves the pack's own copy, its siblings and its `index.html` at whatever they
 were — and the operator reviewing `rendered-docs/signup/` sees a stale set with no warning
 anywhere. Nothing errors; the file you just rendered is perfect, in the wrong place.
@@ -359,7 +359,7 @@ anywhere. Nothing errors; the file you just rendered is perfect, in the wrong pl
 Once a manifest covers a doc, **always** re-render through the manifest:
 
 ```bash
-render-doc --manifest packs/signup.json --strict
+review-md --manifest packs/signup.json --strict
 ```
 
 _(Hit for real: a data set was re-rendered ~six times over an hour while `action-plan.html` and
@@ -367,8 +367,8 @@ _(Hit for real: a data set was re-rendered ~six times over an hour while `action
 
 ## Checklist
 
-1. **In a pack? → `--manifest`.** Otherwise `render-doc <src.md>` — read the footnote warnings; they're usually real.
+1. **In a pack? → `--manifest`.** Otherwise `review-md <src.md>` — read the footnote warnings; they're usually real.
 2. **Open every rendered file in `browser-automation`** (§ _Always open what you rendered_) — check the masthead reads right, set `--kicker` / `--banner-*` if it doesn't, and `grep` the output for a phrase you just added. The ✓ does not prove the edit landed.
 3. `Cmd-P` if a PDF is wanted — the print stylesheet is real, but eyeball page breaks.
 4. Recurring set of docs → add a manifest and check it into the repo being rendered.
-5. Changing the look → change `theme.ts` in the render-doc repo and cut a release, not one output file.
+5. Changing the look → change `theme.ts` in the review-md repo and cut a release, not one output file.
