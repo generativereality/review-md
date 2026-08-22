@@ -1,7 +1,7 @@
 {
   "name": "review-md",
   "description": "Markdown → one self-contained styled HTML file (and a sane PDF) via the `review-md` CLI. Build-time mermaid→inline-SVG, glyph callouts, footnote-integrity checking, sticky jump rail, print stylesheet, pack manifests. Repo-agnostic.",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "author": {
     "name": "generativereality"
   },
