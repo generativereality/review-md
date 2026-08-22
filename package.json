@@ -16,10 +16,11 @@
     "build": "tsdown",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test src/review-md.test.ts",
-    "check": "npm run typecheck && npm run test && npm run build",
+    "check": "npm run leakcheck && npm run typecheck && npm run test && npm run build",
     "release": "bumpp && npm publish",
     "sync-plugin": "bash scripts/sync-plugin.sh",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "leakcheck": "bash scripts/check-leaks.sh"
   },
   "keywords": [
     "claude-code",

@@ -41,6 +41,29 @@ Commits go as **`Motin <motin@motin.eu>`**. Set `user.name`/`user.email` **local
 global git config may well be a different identity. Same for `gh`: `gh auth switch --user motin`
 before any `gh` call against `generativereality/*`.
 
+## ⛔ Before any push: `npm run leakcheck`
+
+`npm run check` runs it; `.githooks/pre-push` runs it again — **enable once per clone**:
+`git config core.hooksPath .githooks`. On the author's machine a *global* hook covers every repo.
+
+**Why it exists.** This project's predecessor repo had to be **deleted and recreated** because its
+first push put 256 internal registry URLs into a public repo through `package-lock.json`. The prose
+had been reviewed; the generated file had not. Force-pushing did not help — GitHub keeps serving
+orphaned commits by SHA. Two sibling repos leaked the same way through `bun.lock`.
+
+- `.npmrc` pins the **public** registry, so a lockfile cannot record a private mirror. If your
+  default registry is an internal mirror, `npm install` here will fail rather than leak — that is
+  intended. Install with `npm install --registry=<your-mirror>`, then `npm run leakcheck -- --fix`
+  (rewrites `resolved`; the `integrity` values are content hashes and stay valid), then confirm
+  `git diff package-lock.json` is empty.
+- Rule 1 is an **allowlist** — every resolution URL in any lockfile must be a known-public host —
+  so it catches mirrors nobody has thought of, and the script embeds no sensitive strings.
+- Rule 2 is a **denylist** read from `~/.config/leakcheck/denylist.txt`, deliberately **outside**
+  the repo. It has a `warn:` tier for things legitimate in a public bio but wrong in a config.
+
+⇒ **Scan the artifact, not the intention.** Grepping the files you authored proves nothing about
+the files a tool generated. Both misses here came from exactly that.
+
 ## Dev gotchas
 
 - **`@types/markdown-it` is pinned to exactly `14.1.2`, and `moduleResolution` is `bundler`.**

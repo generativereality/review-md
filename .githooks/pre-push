@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Last gate before anything becomes public. Enable once per clone:
+#   git config core.hooksPath .githooks
+exec bash "$(git rev-parse --show-toplevel)/scripts/check-leaks.sh"
