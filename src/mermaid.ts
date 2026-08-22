@@ -27,7 +27,7 @@
  *   it will be displayed in, or every box is sized for a font nobody sees.
  */
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 
 import MarkdownIt from "markdown-it";
@@ -146,13 +146,14 @@ export async function renderDiagramBatch(
   const { chromium } = await import("playwright-core");
 
   let browser;
+  const executablePath = resolveChromium() ?? undefined;
   try {
-    browser = await chromium.launch({ headless: true });
+    browser = await chromium.launch({ headless: true, executablePath });
   } catch (cause) {
-    // The overwhelmingly common cause is "no Chromium in the cache", and the stack trace
+    // The overwhelmingly common cause is "no Chromium anywhere", and the stack trace
     // playwright throws for it buries the one line that fixes it. Say the line.
     throw new Error(
-      `render-doc: mermaid needs a headless Chromium to measure text, and it would not start.\n${chromiumHint()}`,
+      `review-md: mermaid needs a headless Chromium to measure text, and it would not start.\n${chromiumHint()}`,
       { cause },
     );
   }
@@ -190,6 +191,65 @@ export async function renderDiagramBatch(
   }
 }
 
+/**
+ * Any Chromium already on this machine — playwright's, or the browser the user runs every day.
+ *
+ * We need a layout engine, not playwright's *particular* build of one. `playwright-core` ships no
+ * browser and resolves a **pinned revision** inside `~/Library/Caches/ms-playwright`, so the
+ * default path fails on two very ordinary machines: one that has never run a Playwright suite,
+ * and one whose cache was populated by an older Playwright. Both were then told to download
+ * 150 MB of Chromium — while `/Applications/Google Chrome.app` sat right there, perfectly able to
+ * call `getBBox()`.
+ *
+ * `chromium.launch({ executablePath })` drives any Chromium-family browser, so ask in order of
+ * least surprise: an explicit override, then playwright's own cache (the pinned, best-tested
+ * build), then the browsers people actually have installed. Only if none of those exist is a
+ * download the honest answer.
+ *
+ * Returns null to mean "let playwright decide", which keeps the no-override path identical to
+ * what it was.
+ */
+function resolveChromium(): string | null {
+  const override = process.env.REVIEW_MD_CHROMIUM;
+  if (override) return override;
+
+  const pinned = chromiumPath();
+  if (pinned && existsSync(pinned)) return pinned;
+
+  for (const candidate of systemChromiumCandidates()) {
+    if (existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
+/** Chromium-family browsers in their stock locations, most-likely first. */
+function systemChromiumCandidates(): string[] {
+  if (process.platform === "darwin") {
+    return [
+      "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "/Applications/Chromium.app/Contents/MacOS/Chromium",
+      "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+      "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
+    ];
+  }
+  if (process.platform === "win32") {
+    const roots = [process.env["PROGRAMFILES"], process.env["PROGRAMFILES(X86)"], process.env["LOCALAPPDATA"]];
+    return roots
+      .filter((root): root is string => Boolean(root))
+      .flatMap((root) => [
+        `${root}\\Google\\Chrome\\Application\\chrome.exe`,
+        `${root}\\Microsoft\\Edge\\Application\\msedge.exe`,
+      ]);
+  }
+  return [
+    "/usr/bin/google-chrome",
+    "/usr/bin/google-chrome-stable",
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
+    "/snap/bin/chromium",
+  ];
+}
+
 /** Where playwright expects the browser, or null if it can't even tell us that. */
 function chromiumPath(): string | null {
   try {
@@ -208,9 +268,10 @@ function chromiumPath(): string | null {
 export function chromiumHint(): string {
   const where = chromiumPath();
   return [
-    "  Install one:  npx playwright install chromium",
+    "  Point at one: REVIEW_MD_CHROMIUM=/path/to/chrome  (any Chromium-family browser works)",
+    "  Or install:   npx playwright install chromium",
     "  Or skip them: pass --no-diagrams to leave ```mermaid fences as code blocks",
-    where ? `  (expected at ${where})` : null,
+    where ? `  (playwright expected its own at ${where})` : null,
   ]
     .filter((line): line is string => line !== null)
     .join("\n");
