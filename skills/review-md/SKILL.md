@@ -375,15 +375,43 @@ lands on a "file not found" page that reads like a broken render.
 
 ## Opening a render at a specific section
 
-⛔ **`scrollIntoView()` via `browser-automation eval` does not stick** — the inlined jump-nav script resets scroll on load, so the screenshot comes back showing the masthead every time. _(Cost several wasted screenshots.)_
+⛔ **Scrolling a render from `browser-automation` silently does nothing** — `scrollIntoView()`,
+`window.scrollTo()` and the anchor hash all fail, and the screenshot comes back showing the masthead
+every time.
 
-✅ **Use the anchor hash instead.** Every `h2` gets a slugged id, so navigate straight to it:
+The cause is this tool's own **`html{scroll-behavior:smooth}`**: in a CDP-driven tab the smooth
+scroll never runs, so the scroll position simply never moves. The tell is that `scrollY` reads **0
+in the very same eval that set it** — which is what distinguishes this from a page that scrolled and
+then got reset:
 
 ```bash
-browser-automation goto -s doc "file://$PWD/rendered-docs/<pack>/<doc>.html#3-conversion-from-step-to-step"
+browser-automation eval -s doc 'window.scrollTo(0,2900); Math.round(scrollY)'   # → 0
 ```
 
-List the available ids with `browser-automation eval -s doc '[...document.querySelectorAll("h2")].map(h=>h.id).join("|")'`. The same hash works in a link you hand someone, which is the better way to point a reviewer at one section than telling them to scroll.
+> ⚠️ This block used to prescribe the anchor hash as the fix, on the theory that the inlined jump-nav
+> script was resetting scroll on load. Both halves were wrong: that script only ever touches the
+> rail's own `scrollTop`, and the hash fails for the same reason everything else does. _(The wrong
+> fix cost several more wasted screenshots than the original problem did.)_
+
+✅ **Best: don't scroll at all.** Capture the whole page and crop to the region you want — no scroll
+state to fight, and one command instead of two:
+
+```bash
+browser-automation screenshot -s doc --full -o full.png
+```
+
+✅ **Or turn smooth off first, in the same eval as the scroll.** Once it is off, the position also
+persists across later commands, so a separate `screenshot` call captures the right place:
+
+```bash
+browser-automation eval -s doc 'document.documentElement.style.scrollBehavior="auto"; scrollTo(0,2900); Math.round(scrollY)'  # → 2900
+browser-automation screenshot -s doc -o section.png
+```
+
+⇒ **Anchor ids are still the right thing to hand a *person*.** Every `h2` gets a slugged id, and
+`…/doc.html#3-conversion-from-step-to-step` scrolls correctly in a human's browser — still the better
+way to point a reviewer at one section than telling them to scroll. It is only automation that
+cannot use them. List the ids with `browser-automation eval -s doc '[...document.querySelectorAll("h2")].map(h=>h.id).join("|")'`.
 
 ## Known gaps — hand-author these, don't bolt them on
 
