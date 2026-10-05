@@ -367,6 +367,12 @@ browser-automation eval -s dataset 'document.title + " | h2s: " + document.query
 grep -c "a phrase you just added" rendered-docs/signup/dataset.html
 ```
 
+⚠️ **A zero from that grep is a claim about the grep until you have shown it can match.** `grep`
+is case-sensitive, so a lower-case probe against a sentence that starts a paragraph returns 0 on
+text that is present, which reads as "the edit did not land" and sends you re-editing a correct
+file. Grep a phrase from the middle of a sentence, or pass `-i`, and pair every "is it there" check
+with an "is the old text gone" check so the two answers cross-examine each other.
+
 ⛔ **`file://` needs an ABSOLUTE path.** A relative one resolves against the browser's own cwd and
 lands on a "file not found" page that reads like a broken render.
 
@@ -384,6 +390,15 @@ browser-automation goto -s doc "file://$PWD/rendered-docs/<pack>/<doc>.html#3-co
 ```
 
 List the available ids with `browser-automation eval -s doc '[...document.querySelectorAll("h2")].map(h=>h.id).join("|")'`. The same hash works in a link you hand someone, which is the better way to point a reviewer at one section than telling them to scroll.
+
+⛔ **But an anchor containing `--` breaks `browser-automation`'s argument parser:** it reads the
+double hyphen as end-of-options and drops the positional, failing with `Positional argument 'url'
+is required`, which looks like a quoting problem and is not. ⚠️ **This renderer's own slugs produce
+`--` routinely:** `&` and em dashes are dropped from a heading and the hyphens around them collapse,
+so `## Structure & Refinements` → `#structure--refinements`. ⇒ When an id contains `--`, navigate
+to the bare URL and scroll after load: `browser-automation eval -s doc
+'document.querySelectorAll("h2")[1].scrollIntoView(); "ok"'` sticks, because the jump-nav script
+resets scroll only **on** load.
 
 ## Known gaps — hand-author these, don't bolt them on
 
@@ -408,6 +423,43 @@ review-md --manifest packs/signup.json --strict
 
 _(Hit for real: a data set was re-rendered ~six times over an hour while `action-plan.html` and
 `index.html` in the same pack stayed three hours old. The operator caught it, not the tool.)_
+
+## ⛔ Two invocations that check nothing and exit 0
+
+- **A pack JSON passed WITHOUT `--manifest` renders the manifest itself.** `review-md
+  packs/signup.json --strict` treats the JSON as a source document: it renders its text to
+  `rendered-docs/signup.html`, prints a cheerful `✓` and exits 0, so `--strict` passed having
+  checked nothing and no doc in the pack was re-rendered. ⭐ The tell is the output: one `✓` at
+  `rendered-docs/[pack].html` instead of one per doc inside `rendered-docs/[pack]/`.
+- ⛔⛔ **Never put a `--` before the arguments.** `parseArgs` treats it as end-of-options and turns
+  every later flag into a positional, and the second positional is the **destination**:
+  `review-md -- doc.md --strict` writes the HTML to a file literally named `--strict`, prints
+  `✓ --strict` and exits 0 with the footnote check never run. With two real paths after a `--` it
+  overwrites the second file. Without the `--`, flag order does not matter.
+
+## ⛔ A pack goes stale in two ways, and neither shows up in the render
+
+Re-rendering keeps the HTML current. It does nothing about the manifest, and the manifest rots:
+
+1. **Docs the project has gained are not in it.** A pack rendering 11 docs when 14 matter looks
+   complete: every listed file is fresh, the index is fresh, and the three a reader now needs are
+   simply absent. ⇒ Before rendering a pack for a review, diff its `src` list against what the
+   project actually has.
+2. ⛔ **Blurbs and kickers go stale, and a stale blurb is worse than none:** it is a contents page
+   telling a reader what a doc says, so they do not open it. "Fifteen decisions" for a list grown
+   to nineteen; a proposal described as live after it was turned down. ⇒ **A blurb stating a COUNT
+   or a STATUS is a claim with a shelf life.** Re-read blurbs when their docs change, and prefer
+   wording that does not need maintaining.
+
+⚠️ `--strict` passes either way, and so does a link checker. Nothing mechanical sees this.
+
+## Page budgets — measure, don't estimate
+
+When a doc has a page budget ("max 2 A4"), measure the printed PDF; word count is a poor predictor
+because the cost is structural. The recipe, the Windows substitutions and what the page count
+actually responds to are in **[`references/print-length.md`](references/print-length.md)**. The
+one that saves the most passes: ⛔ **a blockquote cannot split across pages**, so trimming prose
+above it does nothing until you cut the quote or the tables beside it.
 
 ## Checklist
 
