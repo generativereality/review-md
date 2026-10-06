@@ -25,18 +25,26 @@ traps; read it before changing behaviour.
 3. `git commit` locally.
 4. **Tell the user what's staged & unpublished. Wait for an explicit "publish".**
 
-When the user says publish:
+When the user says publish — **publishing is CI's job; never `npm publish` by hand.**
+`.github/workflows/release.yml` publishes via npm OIDC trusted publishing on a `v*` tag, gated
+on the `release` environment. Every version since 0.1.1 went out that way, with provenance.
 
-1. Bump the version in **both** `package.json` and `.claude-plugin/plugin.json` (keep in sync).
-2. `git commit && git push`.
-3. `npm publish` (granular npmjs token in `~/.npmrc`; never prompt for OTP).
-4. `npm run sync-plugin` — syncs `plugin.json` + the whole `skills/review-md/` directory (SKILL.md
-   and `references/`) to `../plugins`, commits, pushes. Pull `../plugins` first
-   (`git -C ../plugins pull --ff-only`): the script does not, and a clone one release behind
-   diverges the moment it syncs.
+1. Pull `../plugins` first: `git -C ../plugins pull --ff-only`. `sync-plugin` does not pull, and a
+   clone one release behind diverges the moment it syncs.
+2. Bump the version in **both** `package.json` and `.claude-plugin/plugin.json` (keep in sync).
+3. `npm run check`, then `git commit && git push` — **main before the tag**.
+4. `git tag -a v<version> && git push origin v<version>`. The workflow verifies the tag matches
+   `package.json`.
+5. **Approve the run** in the Actions UI. A queued run sits at `waiting` and publishes nothing.
+6. `npm run sync-plugin` — syncs `plugin.json` + the whole `skills/review-md/` directory (SKILL.md
+   and `references/`) to `../plugins`, commits, pushes.
 
-⚠️ **`npm publish` needs `registry.npmjs.org` reachable.** Some networks don't allow it —
-`curl https://registry.npmjs.org/` failing with exit 35 is the tell. Publish from one that does.
+⚠️ **A local `npm publish` fails with `E404 Not Found - PUT …`** even though `npm whoami`
+succeeds. That is an auth refusal reported as "not found", not a missing package — the local token
+cannot publish this package. Hit 2026-10-06 following an older version of this section.
+
+⚠️ **The registry lags a green run.** The log shows `+ @generativereality/review-md@<v>` and npm
+can still 404 the version for a few minutes. A green run plus a 404 means wait.
 
 ## Git identity
 

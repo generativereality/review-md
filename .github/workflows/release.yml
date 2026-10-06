@@ -8,12 +8,6 @@ name: Release
 # Publisher names `generativereality/review-md` + `release.yml`, so renaming this
 # file silently breaks releases until npm is updated to match.
 #
-# ⚠️ **This package has never been published.** npm's Trusted Publisher UI lives
-# on the package's settings page, which does not exist until a first publish —
-# so this workflow cannot authenticate yet. The first version has to go out
-# another way, and only then can the trusted publisher be configured and every
-# release after it come from here.
-#
 # ⚠️ **The Trusted Publisher must actually exist on npmjs.com.** Without it npm
 # never performs the OIDC exchange and `npm publish` fails with `ENEEDAUTH`
 # ("need auth ... you need to authorize this machine"), which reads like a
