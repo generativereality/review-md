@@ -29,6 +29,7 @@ import {
   renderDiagramBatch,
   type Diagram,
 } from "./mermaid.ts";
+import { invocationProblem, knownFlags } from "./invocation.ts";
 import { renderMarkdown } from "./render.ts";
 import { page } from "./theme.ts";
 
@@ -250,28 +251,37 @@ async function prepare(
 }
 
 async function main(): Promise<void> {
-  const { values, positionals } = parseArgs({
-    allowPositionals: true,
-    options: {
-      manifest: { type: "string" },
-      kicker: { type: "string" },
-      "banner-left": { type: "string" },
-      "banner-right": { type: "string" },
-      ghost: { type: "string" },
-      title: { type: "string" },
-      "out-dir": { type: "string" },
-      "toc-depth": { type: "string" },
-      date: { type: "string" },
-      "repo-url": { type: "string" },
-      "no-fonts": { type: "boolean" },
-      "no-diagrams": { type: "boolean" },
-      "no-section-numbers": { type: "boolean" },
-      artifact: { type: "boolean" },
-      strict: { type: "boolean" },
-      quiet: { type: "boolean" },
-      help: { type: "boolean", short: "h" },
-    },
-  });
+  const options = {
+    manifest: { type: "string" },
+    kicker: { type: "string" },
+    "banner-left": { type: "string" },
+    "banner-right": { type: "string" },
+    ghost: { type: "string" },
+    title: { type: "string" },
+    "out-dir": { type: "string" },
+    "toc-depth": { type: "string" },
+    date: { type: "string" },
+    "repo-url": { type: "string" },
+    "no-fonts": { type: "boolean" },
+    "no-diagrams": { type: "boolean" },
+    "no-section-numbers": { type: "boolean" },
+    artifact: { type: "boolean" },
+    strict: { type: "boolean" },
+    quiet: { type: "boolean" },
+    help: { type: "boolean", short: "h" },
+  } as const;
+  const { values, positionals } = parseArgs({ allowPositionals: true, options });
+
+  const refusal = invocationProblem(
+    process.argv.slice(2),
+    positionals,
+    knownFlags(options),
+    values.manifest !== undefined,
+  );
+  if (refusal) {
+    console.error(`✗ ${refusal}`);
+    process.exit(1);
+  }
 
   if (values.help || (!values.manifest && positionals.length === 0)) {
     console.log(USAGE);

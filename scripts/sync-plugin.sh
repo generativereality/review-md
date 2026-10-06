@@ -22,18 +22,28 @@ fi
 
 ERRORS=0
 
-# Files that ship inside the plugin payload. Relative to repo root.
-PAYLOAD_FILES=(
-  "skills/review-md/SKILL.md"
-  ".claude-plugin/plugin.json"
-)
+# The plugin payload: the manifest, plus the WHOLE skill directory.
+#
+# This used to be a fixed list naming SKILL.md alone, so anything under
+# skills/review-md/references/ never reached the marketplace — and --check could
+# not notice, because it only diffed the files on that list. SKILL.md links to
+# references/print-length.md; synced from a list, every installed copy would
+# link to a file that isn't there. A directory has no list to forget to extend.
+SKILL_REL="skills/review-md"
+MANIFEST_REL=".claude-plugin/plugin.json"
+DEST="$PLUGINS_DIR/plugins/review-md"
 
-for rel in "${PAYLOAD_FILES[@]}"; do
-  if ! diff -q "$REPO_ROOT/$rel" "$PLUGINS_DIR/plugins/review-md/$rel" >/dev/null 2>&1; then
-    echo "MISMATCH: $rel differs from plugins repo"
-    ERRORS=1
-  fi
-done
+if ! diff -q "$REPO_ROOT/$MANIFEST_REL" "$DEST/$MANIFEST_REL" >/dev/null 2>&1; then
+  echo "MISMATCH: $MANIFEST_REL differs from plugins repo"
+  ERRORS=1
+fi
+# -r catches added, changed AND removed files, so a reference deleted here is
+# flagged too rather than lingering in the marketplace.
+if ! diff -rq "$REPO_ROOT/$SKILL_REL" "$DEST/$SKILL_REL" >/dev/null 2>&1; then
+  echo "MISMATCH: $SKILL_REL/ differs from plugins repo"
+  diff -rq "$REPO_ROOT/$SKILL_REL" "$DEST/$SKILL_REL" 2>&1 | sed 's/^/  /' || true
+  ERRORS=1
+fi
 
 if [ "$CHECK_ONLY" = true ]; then
   if [ "$ERRORS" -ne 0 ]; then
@@ -45,10 +55,11 @@ if [ "$CHECK_ONLY" = true ]; then
   exit 0
 fi
 
-for rel in "${PAYLOAD_FILES[@]}"; do
-  mkdir -p "$(dirname "$PLUGINS_DIR/plugins/review-md/$rel")"
-  cp -p "$REPO_ROOT/$rel" "$PLUGINS_DIR/plugins/review-md/$rel"
-done
+mkdir -p "$DEST/.claude-plugin" "$DEST/skills"
+cp -p "$REPO_ROOT/$MANIFEST_REL" "$DEST/$MANIFEST_REL"
+# Replace rather than overlay, so a file removed here is removed there too.
+rm -rf "${DEST:?}/$SKILL_REL"
+cp -Rp "$REPO_ROOT/$SKILL_REL" "$DEST/$SKILL_REL"
 
 cd "$PLUGINS_DIR"
 if git diff --quiet && [ -z "$(git status --porcelain plugins/review-md)" ]; then

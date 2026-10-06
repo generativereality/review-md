@@ -12,6 +12,7 @@ import {
   renderDiagramBatch,
   type MermaidPage,
 } from "./mermaid.ts";
+import { invocationProblem, knownFlags } from "./invocation.ts";
 import { renderMarkdown, stripFrontmatter, type RenderOptions } from "./render.ts";
 import { diagramTheme, page, TOKENS } from "./theme.ts";
 
@@ -820,5 +821,43 @@ describe("repo provenance, derived not hardcoded", () => {
 
   it("falls back to the basename rather than a ../../.. path nobody can act on", () => {
     assert.equal(displayPath("/repo/docs", "/elsewhere/NOTES.md"), "NOTES.md");
+  });
+});
+
+describe("invocations that would exit 0 having checked nothing", () => {
+  const FLAGS = knownFlags({ strict: { type: "boolean" }, quiet: { type: "boolean" }, manifest: { type: "string" }, "out-dir": { type: "string" }, help: { type: "boolean", short: "h" } });
+
+  it("refuses a known flag stranded after a `--` terminator", () => {
+    // review-md -- doc.md --strict wrote the HTML to a file named `--strict`, exit 0.
+    const why = invocationProblem(["--", "doc.md", "--strict"], ["doc.md", "--strict"], FLAGS, false);
+    assert.match(why ?? "", /'--strict' came after '--'/);
+  });
+
+  it("recognises a stranded flag written with =value", () => {
+    const why = invocationProblem(["--", "doc.md", "--out-dir=x"], ["doc.md", "--out-dir=x"], FLAGS, false);
+    assert.match(why ?? "", /'--out-dir=x'/);
+  });
+
+  it("keeps `--` usable for a file that genuinely starts with a dash", () => {
+    // The escape hatch parseArgs itself recommends must stay open.
+    assert.equal(invocationProblem(["--", "-notes.md"], ["-notes.md"], FLAGS, false), null);
+  });
+
+  it("refuses a pack JSON passed as a source", () => {
+    const why = invocationProblem(["packs/signup.json", "--strict"], ["packs/signup.json"], FLAGS, false);
+    assert.match(why ?? "", /--manifest packs\/signup\.json/);
+  });
+
+  it("is case-insensitive about the .json extension", () => {
+    assert.notEqual(invocationProblem(["P.JSON"], ["P.JSON"], FLAGS, false), null);
+  });
+
+  it("allows the same JSON under --manifest", () => {
+    assert.equal(invocationProblem(["--manifest", "p.json"], [], FLAGS, true), null);
+  });
+
+  it("allows an ordinary invocation in any flag order", () => {
+    assert.equal(invocationProblem(["--strict", "doc.md"], ["doc.md"], FLAGS, false), null);
+    assert.equal(invocationProblem(["doc.md", "out.html", "--quiet"], ["doc.md", "out.html"], FLAGS, false), null);
   });
 });
