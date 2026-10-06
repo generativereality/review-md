@@ -424,18 +424,22 @@ review-md --manifest packs/signup.json --strict
 _(Hit for real: a data set was re-rendered ~six times over an hour while `action-plan.html` and
 `index.html` in the same pack stayed three hours old. The operator caught it, not the tool.)_
 
-## ⛔ Two invocations that check nothing and exit 0
+## Two invocations that used to check nothing and exit 0
 
-- **A pack JSON passed WITHOUT `--manifest` renders the manifest itself.** `review-md
-  packs/signup.json --strict` treats the JSON as a source document: it renders its text to
-  `rendered-docs/signup.html`, prints a cheerful `✓` and exits 0, so `--strict` passed having
-  checked nothing and no doc in the pack was re-rendered. ⭐ The tell is the output: one `✓` at
-  `rendered-docs/[pack].html` instead of one per doc inside `rendered-docs/[pack]/`.
-- ⛔⛔ **Never put a `--` before the arguments.** `parseArgs` treats it as end-of-options and turns
-  every later flag into a positional, and the second positional is the **destination**:
-  `review-md -- doc.md --strict` writes the HTML to a file literally named `--strict`, prints
-  `✓ --strict` and exits 0 with the footnote check never run. With two real paths after a `--` it
-  overwrites the second file. Without the `--`, flag order does not matter.
+Both are now **refused with exit 1** before anything is written (since 0.1.5). They are
+worth knowing anyway, because an older install still has them and the failure is silent:
+
+- **A pack JSON passed WITHOUT `--manifest`** used to render the JSON's own text to
+  `rendered-docs/<pack>.html`, print `✓` and exit 0 — `--strict` passed having checked
+  nothing, and no doc in the pack was re-rendered. It now says to use `--manifest`. ⭐ On an
+  older install the tell is the output: one `✓` at `rendered-docs/[pack].html` instead of
+  one per doc inside `rendered-docs/[pack]/`.
+- **A `--` before the arguments** ends option parsing, so every later flag became a
+  positional, and the second positional is the **destination**: `review-md -- doc.md
+  --strict` wrote the HTML to a file named `--strict` and exited 0 with the footnote check
+  never run. A known flag after `--` is now refused. `--` before a file that genuinely
+  starts with a dash (`review-md -- -notes.md`) still works — that is what `--` is for.
+  Without a `--`, flag order does not matter.
 
 ## ⛔ A pack goes stale in two ways, and neither shows up in the render
 

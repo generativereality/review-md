@@ -30,7 +30,10 @@ When the user says publish:
 1. Bump the version in **both** `package.json` and `.claude-plugin/plugin.json` (keep in sync).
 2. `git commit && git push`.
 3. `npm publish` (granular npmjs token in `~/.npmrc`; never prompt for OTP).
-4. `npm run sync-plugin` — syncs `plugin.json` + `SKILL.md` to `../plugins`, commits, pushes.
+4. `npm run sync-plugin` — syncs `plugin.json` + the whole `skills/review-md/` directory (SKILL.md
+   and `references/`) to `../plugins`, commits, pushes. Pull `../plugins` first
+   (`git -C ../plugins pull --ff-only`): the script does not, and a clone one release behind
+   diverges the moment it syncs.
 
 ⚠️ **`npm publish` needs `registry.npmjs.org` reachable.** Some networks don't allow it —
 `curl https://registry.npmjs.org/` failing with exit 35 is the tell. Publish from one that does.
