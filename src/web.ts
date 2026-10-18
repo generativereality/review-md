@@ -21,6 +21,7 @@ import mermaid from "mermaid";
 import MarkdownIt from "markdown-it";
 
 import { MEASURED_CUTS, MERMAID_CONFIG } from "./diagram-config.ts";
+import { fontFaceCss } from "./fonts.ts";
 import { renderMarkdown, stripFrontmatter } from "./render.ts";
 import { page, TOC_SCRIPT } from "./theme.ts";
 
@@ -91,8 +92,19 @@ let initialised = false;
 export async function drawDiagrams(doc: Document): Promise<number> {
   const blocks = Array.from(doc.querySelectorAll<HTMLElement>("pre[data-review-md-diagram]"));
   if (blocks.length === 0) return 0;
-  await Promise.all(MEASURED_CUTS.map((cut) => doc.fonts.load(cut).catch(() => [])));
-  await doc.fonts.ready;
+  // mermaid lays labels out in the document it runs in, which is not `doc` when the host draws into a frame
+  // from outside (Windows): that document needs the fonts too, or every box is sized for the fallback font.
+  const here = globalThis.document;
+  if (here !== doc && !here.getElementById("review-md-fonts")) {
+    const style = here.createElement("style");
+    style.id = "review-md-fonts";
+    style.textContent = fontFaceCss();
+    here.head.appendChild(style);
+  }
+  for (const d of here === doc ? [doc] : [doc, here]) {
+    await Promise.all(MEASURED_CUTS.map((cut) => d.fonts.load(cut).catch(() => [])));
+    await d.fonts.ready;
+  }
   if (!initialised) {
     mermaid.initialize(MERMAID_CONFIG as unknown as Parameters<typeof mermaid.initialize>[0]);
     initialised = true;

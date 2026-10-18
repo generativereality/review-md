@@ -964,6 +964,18 @@ describe("the browser build", () => {
       assert.match(out.img ?? "", /^data:image\/gif/);
       assert.equal(out.title, "The plan", "the page's own scripts must not have run");
       assert.equal(out.evilHref, null, "a javascript: link is taken out");
+
+      // A host that draws into a script-less frame from outside (Windows): the same page, in the frame.
+      const framed = await pg.evaluate(async (text) => {
+        const g = globalThis as unknown as { ReviewMd: { mount(d: unknown, m: string): Promise<{ diagrams: number }> }; document: any };
+        const f = g.document.createElement("iframe");
+        f.setAttribute("sandbox", "allow-same-origin");
+        f.srcdoc = "<!doctype html><html><body></body></html>";
+        await new Promise((r) => { f.onload = r; g.document.body.appendChild(f); });
+        const { diagrams } = await g.ReviewMd.mount(f.contentDocument, text);
+        return { diagrams, svg: !!f.contentDocument.querySelector("figure.diagram svg text"), fonts: !!g.document.getElementById("review-md-fonts") };
+      }, md);
+      assert.deepEqual(framed, { diagrams: 1, svg: true, fonts: true });
       assert.equal(out.frames, 0, "a frame is taken out");
     } finally {
       await browser.close();
