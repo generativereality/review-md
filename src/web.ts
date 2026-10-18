@@ -23,7 +23,7 @@ import MarkdownIt from "markdown-it";
 import { MEASURED_CUTS, MERMAID_CONFIG } from "./diagram-config.ts";
 import { fontFaceCss } from "./fonts.ts";
 import { renderMarkdown, stripFrontmatter } from "./render.ts";
-import { page, TOC_SCRIPT } from "./theme.ts";
+import { DARK, diagramTheme, page, TOC_SCRIPT } from "./theme.ts";
 
 declare const __REVIEW_MD_VERSION__: string;
 
@@ -86,7 +86,8 @@ function escapeHtml(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-let initialised = false;
+/** Which palette mermaid was last set up with: diagrams follow the page into dark mode, as its CSS does. */
+let initialisedFor: "light" | "dark" | null = null;
 
 /** Draw every diagram `renderPage` left in `doc`. One that mermaid rejects stays as its source. */
 export async function drawDiagrams(doc: Document): Promise<number> {
@@ -105,9 +106,11 @@ export async function drawDiagrams(doc: Document): Promise<number> {
     await Promise.all(MEASURED_CUTS.map((cut) => d.fonts.load(cut).catch(() => [])));
     await d.fonts.ready;
   }
-  if (!initialised) {
-    mermaid.initialize(MERMAID_CONFIG as unknown as Parameters<typeof mermaid.initialize>[0]);
-    initialised = true;
+  const scheme = (doc.defaultView ?? window).matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  if (initialisedFor !== scheme) {
+    const config = scheme === "dark" ? { ...MERMAID_CONFIG, themeVariables: diagramTheme(DARK) } : MERMAID_CONFIG;
+    mermaid.initialize(config as unknown as Parameters<typeof mermaid.initialize>[0]);
+    initialisedFor = scheme;
   }
   let drawn = 0;
   for (const [i, pre] of blocks.entries()) {

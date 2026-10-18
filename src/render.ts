@@ -308,11 +308,15 @@ const OBSIDIAN_KINDS: Readonly<Record<string, string>> = {
  */
 export function obsidianToMarkdown(markdown: string): string {
   let fenced = false;
+  // Inside a callout that has a glyph: its `>` lines are unwrapped, so the page shows one callout box as Obsidian
+  // does, rather than a glyph callout inside a quote.
+  let unwrapping = false;
   return markdown
     .split(/(?<=\n)/)
     .map((line) => {
       if (/^\s*(```|~~~)/.test(line)) {
         fenced = !fenced;
+        unwrapping = false;
         return line;
       }
       if (fenced) return line;
@@ -321,7 +325,19 @@ export function obsidianToMarkdown(markdown: string): string {
         const [, lead, kind, title, nl = ""] = callout;
         const glyph = OBSIDIAN_KINDS[kind.toLowerCase()];
         const head = title ? `**${title}**` : "";
-        return `${lead}${[glyph, head].filter(Boolean).join(" ")}${nl}`;
+        unwrapping = !!glyph;
+        return `${glyph ? "" : lead}${[glyph, head].filter(Boolean).join(" ")}${nl}`;
+      }
+      if (unwrapping) {
+        const inner = /^\s*>\s?(.*?)(\r?\n)?$/.exec(line);
+        if (!inner) {
+          unwrapping = false;
+        } else if (inner[1].trim() === "") {
+          unwrapping = false;
+          return inner[2] ?? "\n";
+        } else {
+          line = `${inner[1]}${inner[2] ?? ""}`;
+        }
       }
       if (!line.includes("[[")) return line;
       // Not inside a code span.

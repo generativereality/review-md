@@ -883,7 +883,7 @@ describe("the browser build", () => {
   });
 
   it("reads notes as Obsidian writes them: wikilinks, [!kind] callouts, kept line breaks, fields at the end", () => {
-    const md = "---\ncard: q-1\nto: \"Maya\"\n---\n# Draft\n\n## Body\n\nHeadline: One\nText: Two\n\nSee [[other draft|the other one]] and [[plain]], not `[[code]]`.\n\n> [!warning] Check the price\n> It changed.\n";
+    const md = "---\ncard: q-1\nto: \"Maya\"\n---\n# Draft\n\n## Body\n\nHeadline: One\nText: Two\n\nSee [[other draft|the other one]] and [[plain]], not `[[code]]`.\n\n> [!warning] Check the price\n> It changed.\nAfter [[next]].\n";
     const out = render(md, { notes: true, frontmatterAtEnd: true, repoUrl: null });
     assert.match(out.body, /Headline: One<br>\s*Text: Two/);
     assert.match(out.body, /<a href="other%20draft\.md">the other one<\/a>/);
@@ -891,6 +891,9 @@ describe("the browser build", () => {
     assert.match(out.body, /<code>\[\[code\]\]<\/code>/);
     assert.match(out.body, /<strong>Check the price<\/strong>/);
     assert.doesNotMatch(out.body, /\[!warning\]/);
+    assert.doesNotMatch(out.body, /<blockquote>/, "a glyph callout is one box, not a callout inside a quote");
+    assert.match(out.body, /It changed\./);
+    assert.match(out.body, /<a href="next\.md">next<\/a>/, "the line after a callout is still read for links");
     assert.match(out.body, /<th>card<\/th><td>q-1<\/td>/);
     assert.match(out.body, /<th>to<\/th><td>Maya<\/td>/);
     // Off by default: the CLI renders as before.
