@@ -33,7 +33,10 @@ import { createRequire } from "node:module";
 import MarkdownIt from "markdown-it";
 
 import { fontFaceCss } from "./fonts.ts";
-import { diagramTheme, TOKENS } from "./theme.ts";
+import { isMermaidFence, MEASURED_CUTS, MERMAID_CONFIG } from "./diagram-config.ts";
+import { TOKENS } from "./theme.ts";
+
+export { isMermaidFence };
 
 const require_ = createRequire(import.meta.url);
 
@@ -65,14 +68,6 @@ type PageGlobals = {
 /** One entry per mermaid fence in the document, in document order. */
 export type DocDiagrams = readonly Diagram[];
 
-/**
- * `mermaid`, and `mermaid` with attributes after it (` mermaid title="…"`), but not `mermaidjs`.
- * Shared with the fence renderer so the ordinal a diagram is looked up by cannot drift from the
- * ordinal it was rendered at.
- */
-export function isMermaidFence(info: string): boolean {
-  return /^mermaid(\s|$)/.test(info.trim().toLowerCase());
-}
 
 /**
  * The mermaid sources in a document, in document order.
@@ -89,33 +84,7 @@ export function mermaidSources(markdown: string): string[] {
     .map((token) => token.content);
 }
 
-const MERMAID_CONFIG = {
-  startOnLoad: false,
-  securityLevel: "strict",
-  theme: "base",
-  themeVariables: diagramTheme(),
-  fontFamily: TOKENS.body,
-  /**
-   * `<text>` elements, not HTML labels in a `<foreignObject>`. A foreignObject label looks fine
-   * on screen and is the classic thing that comes out blank or clipped when the page is printed
-   * to PDF — and this renderer's print path is half of what it's for.
-   */
-  htmlLabels: false,
-  flowchart: { htmlLabels: false, useMaxWidth: true },
-  sequence: { useMaxWidth: true },
-  state: { useMaxWidth: true },
-} as const;
 
-/**
- * The cuts mermaid measures labels in. `@font-face` is lazy — without asking for each one by
- * name, `document.fonts.ready` resolves against a page that has loaded nothing and every node box
- * gets sized for the fallback font instead of the one the reader will see.
- */
-const MEASURED_CUTS = [
-  '400 14px "IBM Plex Sans"',
-  '500 14px "IBM Plex Sans"',
-  '600 14px "IBM Plex Sans"',
-] as const;
 
 /** The measuring page: no body content, the document's own fonts, nothing fetched. */
 function measuringPageHtml(): string {

@@ -12,7 +12,8 @@ import Token from "markdown-it/lib/token.mjs";
 import path from "node:path";
 
 import { calloutsPlugin } from "./callouts.ts";
-import { isMermaidFence, type DocDiagrams } from "./mermaid.ts";
+import { isMermaidFence } from "./diagram-config.ts";
+import type { DocDiagrams } from "./mermaid.ts";
 import type { TocEntry } from "./theme.ts";
 
 export type RenderOptions = {
@@ -39,6 +40,14 @@ export type RenderOptions = {
    * (or a failed one) falls back to the fenced-code rendering.
    */
   diagrams?: DocDiagrams;
+  /**
+   * Leave each ```mermaid fence for the page to draw: `<pre class="mermaid"
+   * data-review-md-diagram>` holding the escaped source, which `web.ts` replaces with the SVG.
+   * The browser build sets it; the CLI pre-renders instead.
+   */
+  diagramPlaceholders?: boolean;
+  /** An image's `src` as authored → the URL to use instead (a `data:` URI the host read). */
+  images?: Readonly<Record<string, string>>;
 };
 
 export type RenderedDoc = {
@@ -94,6 +103,8 @@ function rewriteHref(href: string, options: RenderOptions): string {
   const [target, hash = ""] = href.split("#");
   if (target === "") return href;
   if (!/\.md$|\/$/.test(target)) return href;
+  // Nothing to point it at: as authored. Also what keeps `node:path` out of the browser build.
+  if (!options.repoUrl && !options.packLinks) return href;
 
   const absolute = path.resolve(path.dirname(options.sourcePath), target);
   const packHref = options.packLinks?.get(absolute);
@@ -200,9 +211,24 @@ function buildMarkdownIt(options: RenderOptions): { md: MarkdownIt; toc: TocEntr
     const diagram = typeof index === "number" ? options.diagrams?.[index] : undefined;
     // No SVG — mermaid rejected it, --no-diagrams was passed, or nothing rendered this doc's
     // fences. Showing the source is the honest degradation; the caller warns about the failure.
+    if (!diagram && options.diagramPlaceholders && typeof index === "number") {
+      return `<figure class="diagram">\n<pre class="mermaid" data-review-md-diagram="${index}">${md.utils.escapeHtml(token.content)}</pre>\n</figure>\n`;
+    }
     if (!diagram || !("svg" in diagram)) return defaultFence(tokens, idx, opts, env, self);
     return `<figure class="diagram">\n${diagram.svg}\n</figure>\n`;
   };
+
+  if (options.images) {
+    const images = options.images;
+    const defaultImage =
+      md.renderer.rules.image ??
+      ((tokens, idx, opts, _env, self) => self.renderToken(tokens, idx, opts));
+    md.renderer.rules.image = (tokens, idx, opts, env, self) => {
+      const src = tokens[idx].attrGet("src");
+      if (src && Object.hasOwn(images, src)) tokens[idx].attrSet("src", images[src]);
+      return defaultImage(tokens, idx, opts, env, self);
+    };
+  }
 
   const defaultLinkOpen =
     md.renderer.rules.link_open ??

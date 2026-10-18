@@ -532,7 +532,7 @@ footer.doc a{color:var(--ink-2)}
  * truth for which layout is live: the CSS media query sets it, this reads it back, so the
  * breakpoint is not duplicated here.
  */
-const TOC_SCRIPT = `
+export const TOC_SCRIPT = `
 (function(){
   var nav=document.querySelector('.toc'); if(!nav) return;
   var links=[].slice.call(nav.querySelectorAll('a[href^="#"]'));
@@ -643,7 +643,7 @@ ${parts.standfirst ? `  <div class="stand">\n${parts.standfirst}\n  </div>\n` : 
 
 ${content}
 
-<footer class="doc">${parts.footer}</footer>
+${parts.footer ? `<footer class="doc">${parts.footer}</footer>` : ""}
 
 </div>
 <script>${TOC_SCRIPT}</script>`;

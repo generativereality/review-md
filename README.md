@@ -137,6 +137,25 @@ local `.html`.
 
 ⚠️ `"out": "index.html"` is reserved — the pack cover is written last and would overwrite it.
 
+## In a web view: the browser build
+
+`dist/review-md.web.js` is the same renderer as one file for a page to run, with no Node, no
+Chromium and nothing fetched: the theme, the fonts and mermaid are inside it (about 4 MB). An app
+carries it and draws a document in its own web view exactly as the CLI writes it.
+
+```js
+// In the page (or an isolated script world on the page's document):
+const wanted = ReviewMd.localImages(markdown);          // ["shot.png", …], for the host to read
+await ReviewMd.mount(document, markdown, {
+  images: { "shot.png": "data:image/png;base64,…" },   // what the host could read
+});
+```
+
+`mount` replaces the document with the rendered page, runs the jump rail and draws each diagram
+in the page. Everything in the document that could run is taken out first: scripts, frames and
+embeds, `on…` handlers and `javascript:` URLs (raw HTML in Markdown passes through otherwise).
+`ReviewMd.renderPage(markdown, options)` returns the HTML without touching a document.
+
 ## The design contract
 
 `src/theme.ts` is the **single source of visual truth**: tokens, type scale, page shell, print
