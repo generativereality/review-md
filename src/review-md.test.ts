@@ -889,10 +889,11 @@ describe("the browser build", () => {
     assert.match(out.body, /<a href="other%20draft\.md">the other one<\/a>/);
     assert.match(out.body, /<a href="plain\.md">plain<\/a>/);
     assert.match(out.body, /<code>\[\[code\]\]<\/code>/);
-    assert.match(out.body, /<strong>Check the price<\/strong>/);
+    assert.match(out.body, /<blockquote class="callout callout-warn obsidian">\s*<p><span class="mark mark-warn"[^>]*>⚠️<\/span> <strong class="callout-title">Check the price<\/strong><br>\s*It changed\./);
     assert.doesNotMatch(out.body, /\[!warning\]/);
-    assert.doesNotMatch(out.body, /<blockquote>/, "a glyph callout is one box, not a callout inside a quote");
-    assert.match(out.body, /It changed\./);
+    // A kind with no glyph is a neutral box, and the whole quote — a list included — is inside it.
+    const ad = render("> [!example] Ad 1\n>\n> **Headline**\n>\n> - one\n> - two\n", { notes: true, repoUrl: null }).body;
+    assert.match(ad, /<blockquote class="callout callout-note obsidian">\s*<p><strong class="callout-title">Ad 1<\/strong><\/p>[\s\S]*<li>two<\/li>[\s\S]*<\/blockquote>/);
     assert.match(out.body, /<a href="next\.md">next<\/a>/, "the line after a callout is still read for links");
     assert.match(out.body, /<th>card<\/th><td>q-1<\/td>/);
     assert.match(out.body, /<th>to<\/th><td>Maya<\/td>/);
