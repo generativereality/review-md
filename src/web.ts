@@ -35,6 +35,10 @@ export type MountOptions = {
   meta?: string;
   footer?: string;
   sectionNumbers?: boolean;
+  /** Obsidian links and callouts, and line breaks kept (`RenderOptions.notes`). On by default. */
+  notes?: boolean;
+  /** The YAML block as a table at the end. On by default. */
+  frontmatterAtEnd?: boolean;
 };
 
 /** Every image the document points at on disk (not a URL, not `data:`), in document order. */
@@ -63,6 +67,8 @@ export function renderPage(markdown: string, options: MountOptions = {}): string
     tocDepth: 2,
     diagramPlaceholders: true,
     images: options.images,
+    notes: options.notes ?? true,
+    frontmatterAtEnd: options.frontmatterAtEnd ?? true,
   });
   return page({
     title: rendered.title || escapeHtml(options.title ?? ""),

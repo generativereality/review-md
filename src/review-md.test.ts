@@ -882,6 +882,23 @@ describe("the browser build", () => {
     assert.doesNotMatch(render("```mermaid\nflowchart LR\n  A --> B\n```\n").body, /data-review-md-diagram/);
   });
 
+  it("reads notes as Obsidian writes them: wikilinks, [!kind] callouts, kept line breaks, fields at the end", () => {
+    const md = "---\ncard: q-1\nto: \"Maya\"\n---\n# Draft\n\n## Body\n\nHeadline: One\nText: Two\n\nSee [[other draft|the other one]] and [[plain]], not `[[code]]`.\n\n> [!warning] Check the price\n> It changed.\n";
+    const out = render(md, { notes: true, frontmatterAtEnd: true, repoUrl: null });
+    assert.match(out.body, /Headline: One<br>\s*Text: Two/);
+    assert.match(out.body, /<a href="other%20draft\.md">the other one<\/a>/);
+    assert.match(out.body, /<a href="plain\.md">plain<\/a>/);
+    assert.match(out.body, /<code>\[\[code\]\]<\/code>/);
+    assert.match(out.body, /<strong>Check the price<\/strong>/);
+    assert.doesNotMatch(out.body, /\[!warning\]/);
+    assert.match(out.body, /<th>card<\/th><td>q-1<\/td>/);
+    assert.match(out.body, /<th>to<\/th><td>Maya<\/td>/);
+    // Off by default: the CLI renders as before.
+    const plain = render(md, { repoUrl: null }).body;
+    assert.doesNotMatch(plain, /<br>/);
+    assert.doesNotMatch(plain, /<th>card/);
+  });
+
   it("draws the page in a browser with no Node, and runs none of the document's scripts", async (t) => {
     const executable = await chromiumExecutable();
     if (!executable) {

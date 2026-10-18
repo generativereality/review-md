@@ -48,6 +48,15 @@ export type RenderOptions = {
   diagramPlaceholders?: boolean;
   /** An image's `src` as authored → the URL to use instead (a `data:` URI the host read). */
   images?: Readonly<Record<string, string>>;
+  /**
+   * Notes written for Obsidian and by agents (the browser build turns these on; the CLI keeps
+   * its own behaviour): `[[name]]` / `[[name|label]]` as links to `name.md`, a blockquote opening
+   * `[!warning] Title` as the matching glyph callout, and every line break kept as written (a draft
+   * puts one field per line, `Headline:` then `Text:`, and joined they read as one sentence).
+   */
+  notes?: boolean;
+  /** Show a leading YAML block as a small table at the end of the page, instead of dropping it. */
+  frontmatterAtEnd?: boolean;
 };
 
 export type RenderedDoc = {
@@ -150,6 +159,7 @@ function buildMarkdownIt(options: RenderOptions): { md: MarkdownIt; toc: TocEntr
     // Off deliberately: the docs already use typographic quotes, and typographer would
     // reinterpret `--flag` as an en dash (and it is the rule with the ReDoS history).
     typographer: false,
+    breaks: options.notes === true,
   });
 
   // Scheme-only autolinking. markdown-it's "fuzzy" linkifier autolinks bare domains, and `.md`
@@ -271,10 +281,75 @@ export function stripFrontmatter(markdown: string): string {
   return blanks + markdown.slice(match[0].length);
 }
 
+/** The leading YAML block's top-level `key: value` lines, in order. */
+export function frontmatterFields(markdown: string): [string, string][] {
+  const match = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/.exec(markdown);
+  if (!match) return [];
+  const out: [string, string][] = [];
+  for (const line of match[1].split(/\r?\n/)) {
+    const m = /^([^\s:#][^:]*):\s*(.*)$/.exec(line);
+    if (m) out.push([m[1].trim(), m[2].trim().replace(/^"(.*)"$/, "$1")]);
+  }
+  return out;
+}
+
+const OBSIDIAN_KINDS: Readonly<Record<string, string>> = {
+  tip: "⭐", hint: "⭐", important: "⭐",
+  warning: "⚠️", caution: "⚠️", attention: "⚠️",
+  danger: "⛔", error: "⛔", bug: "⛔", failure: "⛔", fail: "⛔", missing: "⛔",
+  success: "✅", check: "✅", done: "✅",
+  question: "🚩", help: "🚩", faq: "🚩",
+  todo: "⏸",
+};
+
+/**
+ * `[[name]]` → `[name](<name.md>)`, and `> [!kind] Title` → `> <glyph> **Title**`, outside code.
+ * A kind with no glyph (`note`, `info`, `example`…) keeps its title, bold, as a plain quote.
+ */
+export function obsidianToMarkdown(markdown: string): string {
+  let fenced = false;
+  return markdown
+    .split(/(?<=\n)/)
+    .map((line) => {
+      if (/^\s*(```|~~~)/.test(line)) {
+        fenced = !fenced;
+        return line;
+      }
+      if (fenced) return line;
+      const callout = /^(\s*>\s*)\[!([A-Za-z-]+)\][+-]?\s*(.*?)(\r?\n)?$/.exec(line);
+      if (callout) {
+        const [, lead, kind, title, nl = ""] = callout;
+        const glyph = OBSIDIAN_KINDS[kind.toLowerCase()];
+        const head = title ? `**${title}**` : "";
+        return `${lead}${[glyph, head].filter(Boolean).join(" ")}${nl}`;
+      }
+      if (!line.includes("[[")) return line;
+      // Not inside a code span.
+      return line
+        .split(/(`[^`]*`)/)
+        .map((part) =>
+          part.startsWith("`")
+            ? part
+            : part.replace(/\[\[([^\]\n|]+)(?:\|([^\]\n]+))?\]\]/g, (_m, target: string, label?: string) => {
+                const t = target.trim();
+                const file = t.endsWith(".md") ? t : `${t}.md`;
+                return `[${(label ?? t).trim()}](<${file}>)`;
+              }),
+        )
+        .join("");
+    })
+    .join("");
+}
+
+function escapeText(text: string): string {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 export function renderMarkdown(markdown: string, options: RenderOptions): RenderedDoc {
   const { md, toc } = buildMarkdownIt(options);
   const env: Record<string, unknown> = {};
-  const tokens = md.parse(stripFrontmatter(markdown), env);
+  const source = stripFrontmatter(markdown);
+  const tokens = md.parse(options.notes ? obsidianToMarkdown(source) : source, env);
 
   // Split at the structural seams: H1 → masthead title, everything up to the first H2 →
   // standfirst, the rest → body.
@@ -315,7 +390,15 @@ export function renderMarkdown(markdown: string, options: RenderOptions): Render
     title,
     titleText: h1Inline ? plainText(h1Inline) : "",
     standfirst: render(tokens.slice(afterH1, bodyStart)),
-    body: render(tokens.slice(bodyStart)),
+    body: render(tokens.slice(bodyStart)) + (options.frontmatterAtEnd ? frontmatterTable(markdown) : ""),
     toc,
   };
+}
+
+/** The record's fields, last and small: a reader opens the page on the draft, not on its YAML. */
+function frontmatterTable(markdown: string): string {
+  const fields = frontmatterFields(markdown);
+  if (fields.length === 0) return "";
+  const rows = fields.map(([k, v]) => `<tr><th>${escapeText(k)}</th><td>${escapeText(v)}</td></tr>`).join("\n");
+  return `\n<hr class="frontmatter">\n<div class="tablewrap frontmatter">\n<table>\n<tbody>\n${rows}\n</tbody>\n</table>\n</div>`;
 }
