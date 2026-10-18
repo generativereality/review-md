@@ -30,10 +30,18 @@ async function chromiumExecutable(): Promise<string | null> {
   try {
     const { chromium } = await import("playwright-core");
     const executable = chromium.executablePath();
-    return executable && existsSync(executable) ? executable : null;
+    if (executable && existsSync(executable)) return executable;
   } catch {
-    return null;
+    // fall through to the browser the machine already has
   }
+  const system = [
+    process.env.CHROME,
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/Applications/Chromium.app/Contents/MacOS/Chromium",
+    "/usr/bin/google-chrome",
+    "/usr/bin/chromium",
+  ].find((p): p is string => !!p && existsSync(p));
+  return system ?? null;
 }
 
 function options(overrides: Partial<RenderOptions> = {}): RenderOptions {
@@ -859,5 +867,118 @@ describe("invocations that would exit 0 having checked nothing", () => {
   it("allows an ordinary invocation in any flag order", () => {
     assert.equal(invocationProblem(["--strict", "doc.md"], ["doc.md"], FLAGS, false), null);
     assert.equal(invocationProblem(["doc.md", "out.html", "--quiet"], ["doc.md", "out.html"], FLAGS, false), null);
+  });
+});
+
+describe("the browser build", () => {
+  it("leaves a diagram for the page and swaps in an image the host read", () => {
+    const html = render("# T\n\n## A\n\n```mermaid\nflowchart LR\n  A --> B\n```\n\n![shot](shot.png)\n", {
+      diagramPlaceholders: true,
+      images: { "shot.png": "data:image/png;base64,AAAA" },
+    }).body;
+    assert.match(html, /<pre class="mermaid" data-review-md-diagram="0">flowchart LR\n {2}A --&gt; B\n<\/pre>/);
+    assert.match(html, /src="data:image\/png;base64,AAAA"/);
+    // The CLI's own render is unchanged: no placeholder unless asked.
+    assert.doesNotMatch(render("```mermaid\nflowchart LR\n  A --> B\n```\n").body, /data-review-md-diagram/);
+  });
+
+  it("reads notes as Obsidian writes them: wikilinks, [!kind] callouts, kept line breaks, fields at the end", () => {
+    const md = "---\ncard: q-1\nto: \"Maya\"\n---\n# Draft\n\n## Body\n\nHeadline: One\nText: Two\n\nSee [[other draft|the other one]] and [[plain]], not `[[code]]`.\n\n> [!warning] Check the price\n> It changed.\n";
+    const out = render(md, { notes: true, frontmatterAtEnd: true, repoUrl: null });
+    assert.match(out.body, /Headline: One<br>\s*Text: Two/);
+    assert.match(out.body, /<a href="other%20draft\.md">the other one<\/a>/);
+    assert.match(out.body, /<a href="plain\.md">plain<\/a>/);
+    assert.match(out.body, /<code>\[\[code\]\]<\/code>/);
+    assert.match(out.body, /<strong>Check the price<\/strong>/);
+    assert.doesNotMatch(out.body, /\[!warning\]/);
+    assert.match(out.body, /<th>card<\/th><td>q-1<\/td>/);
+    assert.match(out.body, /<th>to<\/th><td>Maya<\/td>/);
+    // Off by default: the CLI renders as before.
+    const plain = render(md, { repoUrl: null }).body;
+    assert.doesNotMatch(plain, /<br>/);
+    assert.doesNotMatch(plain, /<th>card/);
+  });
+
+  it("draws the page in a browser with no Node, and runs none of the document's scripts", async (t) => {
+    const executable = await chromiumExecutable();
+    if (!executable) {
+      t.skip("no Chromium — run `npx playwright install chromium` to cover this path");
+      return;
+    }
+    const bundlePath = path.resolve(import.meta.dirname, "../dist/review-md.web.js");
+    if (!existsSync(bundlePath)) {
+      t.skip("dist/review-md.web.js is not built — `npm run build`");
+      return;
+    }
+    const { readFileSync } = await import("node:fs");
+    const { chromium } = await import("playwright-core");
+    const browser = await chromium.launch({ headless: true, executablePath: executable });
+    try {
+      const pg = await browser.newPage();
+      await pg.setContent("<!doctype html><html><head><title>host</title></head><body></body></html>");
+      await pg.addScriptTag({ content: readFileSync(bundlePath, "utf8") });
+      const md = [
+        "# The plan",
+        "",
+        "Why it matters.",
+        "",
+        "## How",
+        "",
+        "```mermaid",
+        "flowchart LR",
+        "  Ask --> Draft --> Review",
+        "```",
+        "",
+        "![](shot.png)",
+        "",
+        '<script>document.title = "pwned-inline"</script>',
+        '<img src="x" onerror="document.title = \'pwned-onerror\'">',
+        '<a href="javascript:document.title=\'pwned-href\'" id="evil">x</a>',
+        '<iframe srcdoc="<script>parent.document.title=1</script>"></iframe>',
+        "",
+      ].join("\n");
+      const out = await pg.evaluate(async (text) => {
+        const g = globalThis as unknown as {
+          ReviewMd: { version: string; localImages(m: string): string[]; mount(d: unknown, m: string, o: unknown): Promise<{ diagrams: number }> };
+          document: { title: string; querySelector(s: string): { textContent: string; getAttribute(n: string): string } | null };
+        };
+        const images = g.ReviewMd.localImages(text);
+        const { diagrams } = await g.ReviewMd.mount(g.document, text, { images: { "shot.png": "data:image/gif;base64,R0lGODlhAQABAAAAACw=" } });
+        await new Promise((r) => setTimeout(r, 200));
+        return {
+          version: g.ReviewMd.version,
+          images,
+          diagrams,
+          svg: !!g.document.querySelector("figure.diagram svg"),
+          h1: g.document.querySelector("h1")?.textContent,
+          img: g.document.querySelector("main img")?.getAttribute("src"),
+          title: g.document.title,
+          evilHref: g.document.querySelector("#evil")?.getAttribute("href") ?? null,
+          frames: (g.document as unknown as { querySelectorAll(s: string): { length: number } }).querySelectorAll("iframe").length,
+        };
+      }, md);
+      assert.deepEqual(out.images, ["shot.png"], "a raw <img> is not a markdown image and is left as written");
+      assert.equal(out.diagrams, 1);
+      assert.ok(out.svg, "the diagram should be an SVG");
+      assert.equal(out.h1, "The plan");
+      assert.match(out.img ?? "", /^data:image\/gif/);
+      assert.equal(out.title, "The plan", "the page's own scripts must not have run");
+      assert.equal(out.evilHref, null, "a javascript: link is taken out");
+
+      // A host that draws into a script-less frame from outside (Windows): the same page, in the frame.
+      const framed = await pg.evaluate(async (text) => {
+        const g = globalThis as unknown as { ReviewMd: { mount(d: unknown, m: string): Promise<{ diagrams: number }> }; document: any };
+        const f = g.document.createElement("iframe");
+        f.setAttribute("sandbox", "allow-same-origin");
+        f.srcdoc = "<!doctype html><html><body></body></html>";
+        await new Promise((r) => { f.onload = r; g.document.body.appendChild(f); });
+        const { diagrams } = await g.ReviewMd.mount(f.contentDocument, text);
+        return { diagrams, svg: !!f.contentDocument.querySelector("figure.diagram svg text"), fonts: !!g.document.getElementById("review-md-fonts") };
+      }, md);
+      assert.deepEqual(framed, { diagrams: 1, svg: true, fonts: true });
+      assert.equal(out.frames, 0, "a frame is taken out");
+    } finally {
+      await browser.close();
+    }
   });
 });

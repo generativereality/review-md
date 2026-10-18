@@ -418,6 +418,9 @@ td .badge, th .badge{font-size:.85em}
 
 /* ── tables ────────────────────────────────────────────────────────────── */
 .tablewrap{overflow-x:auto; margin:1.5rem 0 1rem; border:1px solid var(--rule); background:var(--paper-card)}
+hr.frontmatter{margin-top:3rem}
+.tablewrap.frontmatter{font-size:12px; color:var(--ink-3)}
+.tablewrap.frontmatter th{font:500 11px/1.5 var(--mono); text-transform:none; letter-spacing:0; text-align:left; white-space:nowrap}
 table{border-collapse:collapse; width:100%; font-size:.88rem}
 th{
   font:600 11.5px/1.3 var(--mono); letter-spacing:.07em; text-transform:uppercase; color:var(--ink-2);
@@ -532,7 +535,7 @@ footer.doc a{color:var(--ink-2)}
  * truth for which layout is live: the CSS media query sets it, this reads it back, so the
  * breakpoint is not duplicated here.
  */
-const TOC_SCRIPT = `
+export const TOC_SCRIPT = `
 (function(){
   var nav=document.querySelector('.toc'); if(!nav) return;
   var links=[].slice.call(nav.querySelectorAll('a[href^="#"]'));
@@ -643,7 +646,7 @@ ${parts.standfirst ? `  <div class="stand">\n${parts.standfirst}\n  </div>\n` : 
 
 ${content}
 
-<footer class="doc">${parts.footer}</footer>
+${parts.footer ? `<footer class="doc">${parts.footer}</footer>` : ""}
 
 </div>
 <script>${TOC_SCRIPT}</script>`;
