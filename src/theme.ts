@@ -98,8 +98,8 @@ export const DARK = {
  * white, so the border is `ink-3` and edges are `ink-2` (not `--rule`, which vanishes at 10.5pt
  * on a printed page), and every label is full `ink`.
  */
-export function diagramTheme(): Record<string, string> {
-  const t = TOKENS;
+export function diagramTheme(colors: Omit<typeof TOKENS, "body" | "display" | "mono"> | typeof DARK = TOKENS): Record<string, string> {
+  const t = { ...colors, body: TOKENS.body };
   return {
     // flowchart / graph
     background: t.paperDeep,
