@@ -292,7 +292,7 @@ h1 em{font-style:italic; font-weight:400; color:var(--ink-2)}
 .stand{max-width:58rem; color:var(--ink-2)}
 .stand > *{font-size:1.02rem; margin:0 0 .85rem}
 .stand > *:last-child{margin-bottom:0}
-.stand blockquote{margin:0 0 .85rem; padding:0; border:0; background:none; font-style:normal; color:var(--ink-2)}
+.stand blockquote:not(.callout){margin:0 0 .85rem; padding:0; border:0; background:none; font-style:normal; color:var(--ink-2)}
 .stand blockquote p{margin:0 0 .5rem}
 .stand strong{color:var(--ink)}
 .meta{margin-top:1.4rem; font:400 13px/1.6 var(--mono); color:var(--ink-3)}
@@ -406,6 +406,11 @@ li.callout{margin:.55rem 0}
 .callout > :last-child{margin-bottom:0}
 .callout .mark{font-size:1.02em; margin-right:.1em; font-style:normal}
 .callout-therefore{background:var(--paper-deep); border-left-color:var(--accent)}
+/* An Obsidian callout (> [!kind] Title) is a whole quote set as a callout box: upright, full ink. A kind
+   with no glyph of its own (example, note, info, quote) is a neutral box. */
+blockquote.obsidian{font-style:normal; color:var(--ink)}
+blockquote.obsidian .callout-title{display:inline}
+.callout-note{background:var(--paper-card); border-left-color:var(--ink-3)}
 ${calloutCss()}
 
 /* ── inline badges: the same glyphs mid-sentence, or in a table cell ───── */
@@ -418,6 +423,8 @@ td .badge, th .badge{font-size:.85em}
 
 /* ── tables ────────────────────────────────────────────────────────────── */
 .tablewrap{overflow-x:auto; margin:1.5rem 0 1rem; border:1px solid var(--rule); background:var(--paper-card)}
+/* A header row with nothing in it (a two-column field table written with an empty header) draws no bar. */
+thead:not(:has(th:not(:empty))){display:none}
 hr.frontmatter{margin-top:3rem}
 .tablewrap.frontmatter{font-size:12px; color:var(--ink-3)}
 .tablewrap.frontmatter th{font:500 11px/1.5 var(--mono); text-transform:none; letter-spacing:0; text-align:left; white-space:nowrap}

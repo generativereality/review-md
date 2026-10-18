@@ -11,7 +11,7 @@ import footnote from "markdown-it-footnote";
 import Token from "markdown-it/lib/token.mjs";
 import path from "node:path";
 
-import { calloutsPlugin } from "./callouts.ts";
+import { CALLOUTS, calloutsPlugin, type CalloutKind } from "./callouts.ts";
 import { isMermaidFence } from "./diagram-config.ts";
 import type { DocDiagrams } from "./mermaid.ts";
 import type { TocEntry } from "./theme.ts";
@@ -208,6 +208,8 @@ function buildMarkdownIt(options: RenderOptions): { md: MarkdownIt; toc: TocEntr
     }
   });
 
+  if (options.notes) md.core.ruler.push("review_md_obsidian_callouts", obsidianCalloutsRule);
+
   // Tables scroll horizontally rather than blowing out the page width.
   md.renderer.rules.table_open = () => '<div class="tablewrap">\n<table>\n';
   md.renderer.rules.table_close = () => "</table>\n</div>\n";
@@ -293,54 +295,27 @@ export function frontmatterFields(markdown: string): [string, string][] {
   return out;
 }
 
-const OBSIDIAN_KINDS: Readonly<Record<string, string>> = {
-  tip: "⭐", hint: "⭐", important: "⭐",
-  warning: "⚠️", caution: "⚠️", attention: "⚠️",
-  danger: "⛔", error: "⛔", bug: "⛔", failure: "⛔", fail: "⛔", missing: "⛔",
-  success: "✅", check: "✅", done: "✅",
-  question: "🚩", help: "🚩", faq: "🚩",
-  todo: "⏸",
+/** Obsidian's callout kinds → review-md's (`callouts.ts`); a kind not listed is a neutral `note` box. */
+const OBSIDIAN_KINDS: Readonly<Record<string, CalloutKind>> = {
+  tip: "star", hint: "star", important: "star",
+  warning: "warn", caution: "warn", attention: "warn",
+  danger: "stop", error: "stop", bug: "stop", failure: "stop", fail: "stop", missing: "stop",
+  success: "done", check: "done", done: "done",
+  question: "flag", help: "flag", faq: "flag",
+  todo: "parked",
 };
 
-/**
- * `[[name]]` → `[name](<name.md>)`, and `> [!kind] Title` → `> <glyph> **Title**`, outside code.
- * A kind with no glyph (`note`, `info`, `example`…) keeps its title, bold, as a plain quote.
- */
+/** `[[name]]` → `[name](<name.md>)`, and `[[name|label]]` with its label, outside code. */
 export function obsidianToMarkdown(markdown: string): string {
   let fenced = false;
-  // Inside a callout that has a glyph: its `>` lines are unwrapped, so the page shows one callout box as Obsidian
-  // does, rather than a glyph callout inside a quote.
-  let unwrapping = false;
   return markdown
     .split(/(?<=\n)/)
     .map((line) => {
       if (/^\s*(```|~~~)/.test(line)) {
         fenced = !fenced;
-        unwrapping = false;
         return line;
       }
-      if (fenced) return line;
-      const callout = /^(\s*>\s*)\[!([A-Za-z-]+)\][+-]?\s*(.*?)(\r?\n)?$/.exec(line);
-      if (callout) {
-        const [, lead, kind, title, nl = ""] = callout;
-        const glyph = OBSIDIAN_KINDS[kind.toLowerCase()];
-        const head = title ? `**${title}**` : "";
-        unwrapping = !!glyph;
-        return `${glyph ? "" : lead}${[glyph, head].filter(Boolean).join(" ")}${nl}`;
-      }
-      if (unwrapping) {
-        const inner = /^\s*>\s?(.*?)(\r?\n)?$/.exec(line);
-        if (!inner) {
-          unwrapping = false;
-        } else if (inner[1].trim() === "") {
-          unwrapping = false;
-          return inner[2] ?? "\n";
-        } else {
-          line = `${inner[1]}${inner[2] ?? ""}`;
-        }
-      }
-      if (!line.includes("[[")) return line;
-      // Not inside a code span.
+      if (fenced || !line.includes("[[")) return line;
       return line
         .split(/(`[^`]*`)/)
         .map((part) =>
@@ -355,6 +330,46 @@ export function obsidianToMarkdown(markdown: string): string {
         .join("");
     })
     .join("");
+}
+
+/**
+ * Obsidian callouts as one box: a blockquote whose first line is `[!kind] Title` takes the callout class of
+ * that kind, the marker goes, and the title is set bold with the kind's glyph. The whole quote is the box,
+ * lists and paragraphs included, as Obsidian shows it.
+ */
+function obsidianCalloutsRule(state: { tokens: Token[] }): void {
+  const tokens = state.tokens;
+  for (let i = 0; i + 2 < tokens.length; i += 1) {
+    if (tokens[i].type !== "blockquote_open" || tokens[i + 1].type !== "paragraph_open") continue;
+    const inline = tokens[i + 2];
+    const first = inline.children?.[0];
+    if (inline.type !== "inline" || first?.type !== "text") continue;
+    const m = /^\[!([A-Za-z][\w-]*)\][+-]?[ \t]*/.exec(first.content);
+    if (!m) continue;
+    const name = m[1].toLowerCase();
+    const kind: CalloutKind | "note" = Object.hasOwn(OBSIDIAN_KINDS, name) ? OBSIDIAN_KINDS[name] : "note";
+    first.content = first.content.slice(m[0].length);
+    const children = inline.children ?? [];
+    const end = children.findIndex((c) => c.type === "softbreak" || c.type === "hardbreak");
+    const titleEnd = end < 0 ? children.length : end;
+    const glyph = kind === "note" ? "" : `<span class="mark mark-${kind}" aria-hidden="true">${CALLOUTS[kind].glyph}</span> `;
+    const open = new Token("html_inline", "", 0);
+    open.content = `${glyph}<strong class="callout-title">`;
+    const close = new Token("html_inline", "", 0);
+    close.content = "</strong>";
+    const hasTitle = children.slice(0, titleEnd).some((c) => c.type !== "text" || c.content.trim() !== "");
+    inline.children = hasTitle
+      ? [open, ...children.slice(0, titleEnd), close, ...children.slice(titleEnd)]
+      : [htmlInline(glyph), ...children.slice(titleEnd + (end < 0 ? 0 : 1))];
+    const existing = tokens[i].attrGet("class");
+    tokens[i].attrSet("class", `${existing ? `${existing} ` : ""}callout callout-${kind} obsidian`);
+  }
+}
+
+function htmlInline(content: string): Token {
+  const t = new Token("html_inline", "", 0);
+  t.content = content;
+  return t;
 }
 
 function escapeText(text: string): string {
