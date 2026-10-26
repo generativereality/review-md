@@ -13,6 +13,7 @@ import path from "node:path";
 
 import { CALLOUTS, calloutsPlugin, type CalloutKind } from "./callouts.ts";
 import { isMermaidFence } from "./diagram-config.ts";
+import { refusedTags } from "./html-policy.ts";
 import type { DocDiagrams } from "./mermaid.ts";
 import type { TocEntry } from "./theme.ts";
 
@@ -41,6 +42,11 @@ export type RenderOptions = {
    */
   diagrams?: DocDiagrams;
   /**
+   * Pass raw HTML through untouched. Off by default: raw HTML is limited to formatting tags, and
+   * anything else is shown as text — see `html-policy.ts`.
+   */
+  allowHtml?: boolean;
+  /**
    * Leave each ```mermaid fence for the page to draw: `<pre class="mermaid"
    * data-review-md-diagram>` holding the escaped source, which `web.ts` replaces with the SVG.
    * The browser build sets it; the CLI pre-renders instead.
@@ -68,6 +74,8 @@ export type RenderedDoc = {
   standfirst: string;
   body: string;
   toc: TocEntry[];
+  /** Raw HTML the policy refused and showed as text instead, for the caller to warn about. */
+  refusedHtml: string[];
 };
 
 const NUMERIC_CELL = /^[\s\d.,%€$£+×~/–—-]*\d[\s\d.,%€$£+×~/–—-]*$/;
@@ -180,6 +188,29 @@ function buildMarkdownIt(options: RenderOptions): { md: MarkdownIt; toc: TocEntr
     },
   });
   md.use(calloutsPlugin);
+
+  // Raw HTML outside the policy is shown as text rather than dropped, so the author can see it.
+  // Runs straight after inline parsing — before the callout and task-list rules and the section
+  // markers add their own trusted HTML — so it only ever sees what the author wrote.
+  md.core.ruler.after("inline", "review_md_html_policy", (state) => {
+    if (options.allowHtml) return;
+    const refused: string[] = ((state.env as Record<string, unknown>).refusedHtml ??= []) as string[];
+    const visit = (tokens: Token[]) => {
+      for (const token of tokens) {
+        if (token.children) visit(token.children);
+        if (token.type !== "html_block" && token.type !== "html_inline") continue;
+        const tags = refusedTags(token.content);
+        if (tags.length === 0) continue;
+        refused.push(...tags);
+        if (token.type === "html_inline") {
+          token.type = "text";
+        } else {
+          token.content = `<pre class="refused-html">${escapeText(token.content)}</pre>\n`;
+        }
+      }
+    };
+    visit(state.tokens);
+  });
 
   // Numeric cells get tabular figures — these docs are table-heavy and columns of € and %
   // read badly proportional.
@@ -423,6 +454,7 @@ export function renderMarkdown(markdown: string, options: RenderOptions): Render
     standfirst: render(tokens.slice(afterH1, bodyStart)),
     body: render(tokens.slice(bodyStart)) + (options.frontmatterAtEnd ? frontmatterTable(markdown) : ""),
     toc,
+    refusedHtml: (env.refusedHtml as string[] | undefined) ?? [],
   };
 }
 

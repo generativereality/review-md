@@ -57,7 +57,9 @@ Options
   --no-section-numbers     don't prefix H2s with §1, §2, …
   --artifact               emit body-level HTML for publishing as a Claude Artifact
                            (no doctype/<html>/<head>/<body> — the host supplies those)
-  --strict                 exit 1 if the footnote integrity check finds anything
+  --allow-html             pass all raw HTML through (default: only formatting tags such as
+                           <br>, <span> and <details>; anything else is shown as text)
+  --strict                 exit 1 if the footnote check finds anything, or raw HTML was refused
   --quiet                  only print warnings
 `.trim();
 
@@ -128,6 +130,8 @@ type GlobalOptions = {
   tocDepth: 2 | 3;
   /** Emit body-level HTML for a Claude Artifact rather than a standalone document. */
   artifact: boolean;
+  /** Pass every raw HTML tag through. Off: only formatting tags survive (see html-policy.ts). */
+  allowHtml: boolean;
   strict: boolean;
   quiet: boolean;
 };
@@ -165,7 +169,6 @@ function renderOne(
   const diagramProblems = context.synthesised
     ? false
     : reportDiagramProblems(job.absSrc, context.diagrams ?? []);
-  const hadProblems = footnoteProblems || diagramProblems;
 
   // The root that owns the *source*, not the invocation cwd — see `rootOwning`.
   const root = rootOwning(job.absSrc, context.root);
@@ -181,7 +184,19 @@ function renderOne(
     sectionNumbers: globals.sectionNumbers,
     tocDepth: globals.tocDepth,
     diagrams: context.diagrams,
+    // The pack's contents page is markdown this tool wrote, not a document it was handed.
+    allowHtml: globals.allowHtml || context.synthesised === true,
   });
+
+  if (rendered.refusedHtml.length > 0) {
+    console.warn(
+      `⚠ ${path.relative(process.cwd(), job.absSrc)}: ${rendered.refusedHtml.length} raw HTML tag(s) outside the allowed set, shown as text: ${rendered.refusedHtml
+        .slice(0, 3)
+        .map((tag) => tag.slice(0, 60))
+        .join("  ")}${rendered.refusedHtml.length > 3 ? "  …" : ""} (pass --allow-html for a doc you trust)`,
+    );
+  }
+  const hadProblems = footnoteProblems || diagramProblems || rendered.refusedHtml.length > 0;
 
   const repoRelative = displayPath(root, job.absSrc);
   const title =
@@ -266,6 +281,7 @@ async function main(): Promise<void> {
     "no-diagrams": { type: "boolean" },
     "no-section-numbers": { type: "boolean" },
     artifact: { type: "boolean" },
+    "allow-html": { type: "boolean" },
     strict: { type: "boolean" },
     quiet: { type: "boolean" },
     help: { type: "boolean", short: "h" },
@@ -298,6 +314,7 @@ async function main(): Promise<void> {
     sectionNumbers: values["no-section-numbers"] !== true,
     tocDepth,
     artifact: values.artifact === true,
+    allowHtml: values["allow-html"] === true,
     strict: values.strict === true,
     quiet: values.quiet === true,
   };
@@ -391,7 +408,7 @@ async function main(): Promise<void> {
   }
 
   if (problems && globals.strict) {
-    console.error("✗ integrity problems above (footnotes / diagrams), and --strict was set");
+    console.error("✗ integrity problems above (footnotes / diagrams / refused HTML), and --strict was set");
     process.exit(1);
   }
 }

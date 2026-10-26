@@ -22,6 +22,7 @@
 
 import { CALLOUTS, type CalloutKind } from "./callouts.ts";
 import { fontFaceCss } from "./fonts.ts";
+import { contentSecurityPolicy } from "./html-policy.ts";
 
 /**
  * The palette and the font stacks, as data. `:root` below is generated from this, and so is the
@@ -680,6 +681,7 @@ ${body}
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="${contentSecurityPolicy(TOC_SCRIPT)}">
 <title>${escapeHtml(parts.title)}</title>
 <style>
 ${styles(parts.embedFonts)}
