@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { describe, it } from "node:test";
@@ -14,6 +15,7 @@ import {
 } from "./mermaid.ts";
 import { invocationProblem, knownFlags } from "./invocation.ts";
 import { renderMarkdown, stripFrontmatter, type RenderOptions } from "./render.ts";
+import { scriptHash } from "./html-policy.ts";
 import { diagramTheme, page, TOKENS } from "./theme.ts";
 
 const ROOT = "/repo";
@@ -867,6 +869,106 @@ describe("invocations that would exit 0 having checked nothing", () => {
   it("allows an ordinary invocation in any flag order", () => {
     assert.equal(invocationProblem(["--strict", "doc.md"], ["doc.md"], FLAGS, false), null);
     assert.equal(invocationProblem(["doc.md", "out.html", "--quiet"], ["doc.md", "out.html"], FLAGS, false), null);
+  });
+});
+
+describe("raw HTML policy", () => {
+  it("keeps the formatting tags real docs use", () => {
+    const { body, refusedHtml } = render(
+      "## A\n\n| a | b |\n| - | - |\n| one<br>two | <span class=\"x\">y</span> |\n\n<details><summary>More</summary>\n\nHidden.\n\n</details>\n",
+    );
+    assert.deepEqual(refusedHtml, []);
+    assert.match(body, /one<br>two/);
+    assert.match(body, /<span class="x">y<\/span>/);
+    assert.match(body, /<details><summary>More<\/summary>/);
+  });
+
+  it("shows a script block as text instead of running it", () => {
+    const { body, refusedHtml } = render("## A\n\n<script>alert(1)</script>\n");
+    assert.ok(refusedHtml.length > 0);
+    assert.doesNotMatch(body, /<script>/);
+    assert.match(body, /<pre class="refused-html">&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
+  });
+
+  it("refuses event handlers and script URLs on an otherwise allowed tag", () => {
+    for (const html of [
+      '<img src="x.png" onerror="alert(1)">',
+      '<a href="javascript:alert(1)">x</a>',
+      '<a href="java&#x09;script:alert(1)">x</a>',
+      '<a href="data:text/html,<b>x</b>">x</a>',
+      '<span style="background:url(javascript:alert(1))">x</span>',
+    ]) {
+      const { body, refusedHtml } = render(`## A\n\nBefore ${html} after.\n`);
+      assert.ok(refusedHtml.length > 0, `expected ${html} to be refused`);
+      // Refused HTML survives only as escaped text, never as a live element.
+      assert.doesNotMatch(body, /<img|<a href|<span style/, html);
+    }
+  });
+
+  it("refuses tags that load or navigate", () => {
+    for (const html of [
+      '<iframe src="https://example.com"></iframe>',
+      '<meta http-equiv="refresh" content="0;url=https://example.com">',
+      '<base href="https://example.com/">',
+      '<form action="https://example.com"><input name="q"></form>',
+      '<svg><script>alert(1)</script></svg>',
+    ]) {
+      const { refusedHtml } = render(`## A\n\n${html}\n`);
+      assert.ok(refusedHtml.length > 0, `expected ${html} to be refused`);
+    }
+  });
+
+  it("refuses a comment the browser would close early, letting a tag through", () => {
+    // A browser ends a comment at `<!-->`, `<!--->` and `--!>`, not only at `-->`, so each of
+    // these reads to us as one comment and to a browser as a comment followed by a live tag.
+    for (const html of [
+      '<!--><meta http-equiv="refresh" content="0;url=https://example.test/">-->',
+      '<!---><meta http-equiv="refresh" content="0;url=https://example.test/">-->',
+      '<!-- a --!><img src=x onerror="alert(1)">-->',
+    ]) {
+      const { body, refusedHtml } = render(`## A\n\n${html}\n`);
+      assert.ok(refusedHtml.length > 0, `expected ${html} to be refused`);
+      assert.doesNotMatch(body, /<meta|<img/, html);
+    }
+  });
+
+  it("keeps an ordinary comment", () => {
+    const { refusedHtml } = render("## A\n\n<!-- TODO: add the chart -->\n\nText.\n");
+    assert.deepEqual(refusedHtml, []);
+  });
+
+  it("refuses raw HTML in the title, which is rendered unescaped in the masthead", () => {
+    const { title, refusedHtml } = render('# Plan <img src=x onerror="alert(1)">\n\nBody.\n');
+    assert.ok(refusedHtml.length > 0);
+    assert.doesNotMatch(title, /<img/);
+  });
+
+  it("passes everything through with allowHtml", () => {
+    const { body, refusedHtml } = render("## A\n\n<script>alert(1)</script>\n", { allowHtml: true });
+    assert.deepEqual(refusedHtml, []);
+    assert.match(body, /<script>alert\(1\)<\/script>/);
+  });
+
+  it("ships a CSP that allows only the page's own script", () => {
+    const html = page({
+      title: "T",
+      standfirst: "",
+      meta: "",
+      toc: [],
+      body: "",
+      footer: "",
+      embedFonts: false,
+      artifact: false,
+    });
+    const csp = /<meta http-equiv="Content-Security-Policy" content="([^"]+)">/.exec(html)?.[1];
+    assert.ok(csp, "expected a CSP meta tag");
+    assert.match(csp, /default-src 'none'/);
+    assert.match(csp, /script-src 'sha256-[A-Za-z0-9+/=]+'(;|$)/);
+    const script = /<script>([\s\S]*?)<\/script>/.exec(html)?.[1] ?? "";
+    assert.ok(csp.includes(scriptHash(script)), "the CSP hash must match the page's script");
+    for (const sample of ["", "abc", script, "é".repeat(100), "x".repeat(55), "x".repeat(56), "x".repeat(64)])
+      assert.equal(scriptHash(sample), `'sha256-${createHash("sha256").update(sample, "utf8").digest("base64")}'`);
+    assert.ok(html.indexOf("Content-Security-Policy") < html.indexOf("<style>"));
   });
 });
 

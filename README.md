@@ -39,6 +39,11 @@ This closes that gap without asking you to leave markdown.
   a URL that opens on a phone. The artifact sandbox blocks every external host, which is exactly
   the constraint this renderer was already built for — the CSS, fonts and diagrams are inline, so
   nothing has to be given up to publish one.
+- **Safe to open in a signed-in browser.** Raw HTML in the markdown is limited to formatting tags
+  (`<br>`, `<span>`, `<details>`, tables, images); anything else, from `<script>` to an `onerror=`
+  attribute or a `javascript:` link, is shown as text and warned about. Every page also carries a
+  Content Security Policy that lets only its own jump-rail script run and loads nothing but
+  images. `--allow-html` lifts the tag filter for a doc you wrote yourself; the policy stays.
 - **Packs.** A JSON manifest renders a whole set in one command, generates an `index.html` cover,
   and cross-links the docs to each other — so the output folder is navigable on its own.
 
@@ -101,7 +106,8 @@ review-md --manifest <pack.json> [options]
 | `--no-fonts`            | skip the inlined woff2 (~225 KB smaller; needs the fonts locally)  |
 | `--no-diagrams`         | leave `mermaid` fences as code blocks (skips the headless browser) |
 | `--no-section-numbers`  | drop the `§1 §2` prefixes                                          |
-| `--strict`              | exit 1 on any footnote or diagram problem                          |
+| `--allow-html`          | pass all raw HTML through, not only formatting tags                |
+| `--strict`              | exit 1 on any footnote, diagram or refused-HTML problem            |
 | `--quiet`               | only print warnings                                                |
 
 ### ⛔ A second path is the DESTINATION, not a second source

@@ -204,6 +204,11 @@ all). A 1:2 flowchart lands at roughly 6pt: small, but vector, so it stays sharp
 the footnote check, so `--strict` fails on it. If a diagram renders as a code block, read the
 `⚠ mermaid` line; it carries mermaid's own parse error with the line number.
 
+⚠️ **Raw HTML outside the formatting set is shown as text, and warns** (`⚠ … raw HTML tag(s) outside
+the allowed set`). A placeholder written as `<company>` hits this too — that is the fix, not a
+regression: it used to vanish as an unknown element. Write placeholders in backticks. Pass
+`--allow-html` only for a doc the operator wrote; the page's Content Security Policy still applies.
+
 ### What else the renderer does for free
 
 - **GFM**: tables, footnotes with backlinks, fenced code, task lists, nested lists, blockquotes.
